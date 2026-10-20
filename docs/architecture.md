@@ -191,8 +191,9 @@ type AccountStatus = 'connecting' | 'live' | 'resyncing' | 'down';
 
 ## 5. ExchangeAdapter interface
 
-Defined in `packages/adapter`. Members carry the milestone that implements them; M1 code
-implements only the M1 members — no stubs for later ones.
+Defined in `packages/adapter`, except `Credential` and `CredentialReport`, which live in
+`packages/core` because `packages/secrets` may import only core. Members carry the milestone that
+implements them; M1 code implements only the M1 members — no stubs for later ones.
 
 ```ts
 interface ExchangeAdapter {
