@@ -80,7 +80,7 @@ packages/secrets @tradedeck/secrets  SecretStore interface + keychain implementa
 
 ## Import direction
 
-One-way, enforced by `test/workspace.test.ts` (lands in M1 issue 1) from the declared
+One-way, enforced by `test/workspace.test.ts` (since M1 issue 1) from the declared
 `package.json` dependencies — an undeclared edge cannot be imported by accident:
 
 ```
@@ -100,7 +100,8 @@ a credential or talks to a venue. Each later venue is its own package (`packages
 
 ## Commands
 
-The scripts below land with M1 issue 1 (workspace scaffold); until then nothing runs.
+`check`, `typecheck` and `test` exist since M1 issue 1 (#2); `cli` lands with #10 and `dev` with
+#12, together with the code they run.
 
 ```bash
 bun install

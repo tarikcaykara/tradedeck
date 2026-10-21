@@ -1,0 +1,13 @@
+{
+	"name": "@tradedeck/adapter",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"description": "ExchangeAdapter interface, capabilities and transport.",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"dependencies": {
+		"@tradedeck/core": "workspace:*"
+	}
+}

@@ -1,0 +1,22 @@
+{
+	"name": "tradedeck",
+	"private": true,
+	"type": "module",
+	"engines": {
+		"bun": ">=1.4.3"
+	},
+	"workspaces": [
+		"apps/*",
+		"packages/*"
+	],
+	"scripts": {
+		"check": "biome check .",
+		"typecheck": "tsc --noEmit",
+		"test": "bun test"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.6.2",
+		"@types/bun": "^1.4.0",
+		"typescript": "^7.0.2"
+	}
+}

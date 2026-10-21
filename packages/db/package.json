@@ -1,0 +1,13 @@
+{
+	"name": "@tradedeck/db",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"description": "Drizzle schema, migrations and client.",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"dependencies": {
+		"@tradedeck/core": "workspace:*"
+	}
+}
