@@ -143,12 +143,13 @@ money path — spot buys and sells; opening, closing and editing futures positio
 that can trade. A PR there that Claude both writes and merges has no second reader.
 
 **Decision:** Supersedes "Claude merges its own PRs once CI is green" for PRs that touch
-`packages/core`, keys, the order path, the live-trading flag, the loopback/Host/Origin guard or the
-hard rules (exact list in `CLAUDE.md`, Workflow): the owner reviews and merges those. Every PR
-first gets a review pass by an agent that did not write it.
+`packages/core`, keys, the order path, the fills ledger, the live-trading flag, the
+loopback/Host/Origin guard or the hard rules (exact list in `CLAUDE.md`, Workflow): the owner
+reviews and merges those. Every PR first gets a review pass by an agent that did not write it.
 
 **Consequences:**
-- Most of M1 — core, request signing, secrets, `keys`, the server guard — lands through owner
-  review; the public price feed, the database, the read-only UI and `doctor` usually do not.
+- Most of M1 — core, request signing, secrets, `keys`, the credential check, the fills ledger, the
+  server guard — lands through owner review; the public price feed, the read-only UI and `doctor`
+  usually do not.
 - The reviewer-agent pass catches what it can before the owner reads the PR; it does not replace
   his review.

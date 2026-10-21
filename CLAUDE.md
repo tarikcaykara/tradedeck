@@ -123,10 +123,13 @@ bun run check && bun run typecheck && bun test   # the gate — green before eve
   the PR body.
 - Owner-review PRs: Claude never merges a PR that touches any of
   - `packages/core`: domain types, decimal rules, PnL, average cost, protocol schemas;
-  - keys: `packages/secrets`, the CLI `keys` commands, request signing, the credential permission
-    check (hard rule 2);
+  - keys: `packages/secrets`, credential handling in `apps/server` and `apps/cli`, the CLI `keys`
+    commands, request signing, and `verifyCredential()` / `CredentialReport` (every permission
+    field, not only hard rule 2);
   - the order path: placing, editing, cancelling or closing an order; leverage, margin mode, TP/SL;
-    close-all and cancel-all — in the adapter, the OrderRouter or the UI;
+    close-all and cancel-all; `order_intents` persistence and reconciliation — in the adapter, the
+    OrderRouter, `packages/db` or the UI;
+  - the fills ledger: its schema, ingestion, deduplication and the coverage rule for average cost;
   - the live-trading flag (hard rule 7) or the server's loopback/Host/Origin guard (hard rule 3);
   - the hard rules or this list.
 
