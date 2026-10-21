@@ -4,7 +4,7 @@ Local-first, open-source multi-exchange trading terminal: monitor spot balances 
 positions and trade from one screen. Binance first; more CEXes and perp DEXes behind the same
 adapter interface.
 
-**Status:** design phase (M0) — nothing runs yet.
+**Status:** M1 in progress — workspace and tooling only; nothing user-facing runs yet.
 
 ## Safety model
 
