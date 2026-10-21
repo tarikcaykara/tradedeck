@@ -42,7 +42,8 @@ signals or scheduled orders are part of any planned milestone (M0–M4).
    injected.
 9. Development and tests never call live venue endpoints. Adapters are tested with injected
    `fetch`, scrubbed recordings and a local fake WS server; live smoke runs only on Demo.
-10. Never commit to `master`; never merge. Branch `<type>/<issue>-<slug>` → PR → the owner merges.
+10. Never commit to `master`. Branch `<type>/<issue>-<slug>` → PR → green CI → squash merge, by
+    Claude (standing permission from the owner, `docs/decisions.md`) or the owner.
 
 ## Tech stack
 
@@ -114,7 +115,7 @@ bun run check && bun run typecheck && bun test   # the gate — green before eve
 
 - `gh` runs as the repo owner: prefix every call with `GH_TOKEN="$(gh auth token -u tarikcaykara)"`
   (the active gh account is a different one). Never ask for, store or handle credentials.
-- One issue at a time, chosen by the owner. Issue → branch `<type>/<issue>-<slug>` → PR → the owner
-  reviews and merges.
+- One issue at a time, chosen by the owner. Issue → branch `<type>/<issue>-<slug>` → PR → green CI
+  → squash merge with the PR title as the commit subject.
 - Conventional Commits; one logical change per commit; no `Co-Authored-By` trailers.
 - Update `README.md`, `CLAUDE.md` and `docs/` in the same PR as any behaviour change.
