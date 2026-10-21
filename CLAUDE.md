@@ -42,8 +42,9 @@ signals or scheduled orders are part of any planned milestone (M0–M4).
    injected.
 9. Development and tests never call live venue endpoints. Adapters are tested with injected
    `fetch`, scrubbed recordings and a local fake WS server; live smoke runs only on Demo.
-10. Never commit to `master`. Branch `<type>/<issue>-<slug>` → PR → green CI → squash merge, by
-    Claude (standing permission from the owner, `docs/decisions.md`) or the owner.
+10. Never commit to `master`. Branch `<type>/<issue>-<slug>` → PR → reviewer-agent pass → green CI
+    → squash merge. A PR that touches money, keys or `packages/core` is merged only by the owner
+    (Workflow, owner-review PRs); Claude merges every other PR.
 
 ## Tech stack
 
@@ -115,7 +116,24 @@ bun run check && bun run typecheck && bun test   # the gate — green before eve
 
 - `gh` runs as the repo owner: prefix every call with `GH_TOKEN="$(gh auth token -u tarikcaykara)"`
   (the active gh account is a different one). Never ask for, store or handle credentials.
-- One issue at a time, chosen by the owner. Issue → branch `<type>/<issue>-<slug>` → PR → green CI
-  → squash merge with the PR title as the commit subject.
+- One issue at a time, chosen by the owner. Issue → branch `<type>/<issue>-<slug>` → PR →
+  reviewer-agent pass → green CI → squash merge with the PR title as the commit subject.
+- Reviewer-agent pass: before a PR is merged or handed to the owner, an agent that did not write
+  the change reviews its diff. Claude fixes or answers every finding and summarises the review in
+  the PR body.
+- Owner-review PRs: Claude never merges a PR that touches any of
+  - `packages/core`: domain types, decimal rules, PnL, average cost, protocol schemas;
+  - keys: `packages/secrets`, credential handling in `apps/server` and `apps/cli`, the CLI `keys`
+    commands, request signing, and `verifyCredential()` / `CredentialReport` (every permission
+    field, not only hard rule 2);
+  - the order path: placing, editing, cancelling or closing an order; leverage, margin mode, TP/SL;
+    close-all and cancel-all; `order_intents` persistence and reconciliation — in the adapter, the
+    OrderRouter, `packages/db` or the UI;
+  - the fills ledger: its schema, ingestion, deduplication and the coverage rule for average cost;
+  - the live-trading flag (hard rule 7) or the server's loopback/Host/Origin guard (hard rule 3);
+  - the hard rules or this list.
+
+  Such a PR's body opens with `Owner review: <item>`. Claude stops once CI is green and the review
+  is done, tells the owner, and the owner reviews and merges.
 - Conventional Commits; one logical change per commit; no `Co-Authored-By` trailers.
 - Update `README.md`, `CLAUDE.md` and `docs/` in the same PR as any behaviour change.
