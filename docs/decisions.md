@@ -135,3 +135,20 @@ commit subject. `master` still takes no direct commits, and the owner still choo
   an account approve its own PR.
 - `master` has no branch protection, so only this rule enforces the green-CI condition.
 - The owner's review moves to the plan before the work and to `master` after the merge.
+
+## 2026-10-21 — Owner reviews PRs that touch money, keys or core
+
+**Context:** Later the same day, the owner narrowed the permission above. What matters most is the
+money path — spot buys and sells; opening, closing and editing futures positions — and the keys
+that can trade. A PR there that Claude both writes and merges has no second reader.
+
+**Decision:** Supersedes "Claude merges its own PRs once CI is green" for PRs that touch
+`packages/core`, keys, the order path, the live-trading flag, the loopback/Host/Origin guard or the
+hard rules (exact list in `CLAUDE.md`, Workflow): the owner reviews and merges those. Every PR
+first gets a review pass by an agent that did not write it.
+
+**Consequences:**
+- Most of M1 — core, request signing, secrets, `keys`, the server guard — lands through owner
+  review; the public price feed, the database, the read-only UI and `doctor` usually do not.
+- The reviewer-agent pass catches what it can before the owner reads the PR; it does not replace
+  his review.
