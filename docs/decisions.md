@@ -121,3 +121,17 @@ each adapter's `KindCapabilities` flags.
 
 **Consequences:** Results are reported per position or symbol, and partial success is a normal
 outcome the UI must show.
+
+## 2026-10-21 — Claude merges its own PRs once CI is green
+
+**Context:** Until now only the owner merged, so every finished issue waited for him. On
+2026-10-21 the owner gave Claude standing permission to merge PRs.
+
+**Decision:** Claude squash-merges a PR once its CI `gate` check is green. The PR title is the
+commit subject. `master` still takes no direct commits, and the owner still chooses the issues.
+
+**Consequences:**
+- No approval is recorded. Claude opens PRs as the owner's GitHub account, and GitHub does not let
+  an account approve its own PR.
+- `master` has no branch protection, so only this rule enforces the green-CI condition.
+- The owner's review moves to the plan before the work and to `master` after the merge.
