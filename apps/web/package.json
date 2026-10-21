@@ -1,0 +1,10 @@
+{
+	"name": "@tradedeck/web",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"description": "React UI; talks only to apps/server.",
+	"dependencies": {
+		"@tradedeck/core": "workspace:*"
+	}
+}

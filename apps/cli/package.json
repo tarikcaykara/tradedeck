@@ -1,0 +1,14 @@
+{
+	"name": "@tradedeck/cli",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"description": "keys add, list and remove; doctor.",
+	"dependencies": {
+		"@tradedeck/core": "workspace:*",
+		"@tradedeck/adapter": "workspace:*",
+		"@tradedeck/binance": "workspace:*",
+		"@tradedeck/db": "workspace:*",
+		"@tradedeck/secrets": "workspace:*"
+	}
+}

@@ -1,0 +1,10 @@
+{
+	"name": "@tradedeck/core",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"description": "Pure domain types, decimal rules, PnL, average cost and protocol schemas.",
+	"exports": {
+		".": "./src/index.ts"
+	}
+}

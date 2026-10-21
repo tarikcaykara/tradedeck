@@ -1,0 +1,14 @@
+{
+	"name": "@tradedeck/binance",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"description": "Binance spot and USDⓈ-M adapter (live and demo).",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"dependencies": {
+		"@tradedeck/adapter": "workspace:*",
+		"@tradedeck/core": "workspace:*"
+	}
+}

@@ -1,0 +1,14 @@
+{
+	"name": "@tradedeck/server",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"description": "Credentials, venue sessions, state store and API on loopback.",
+	"dependencies": {
+		"@tradedeck/core": "workspace:*",
+		"@tradedeck/adapter": "workspace:*",
+		"@tradedeck/binance": "workspace:*",
+		"@tradedeck/db": "workspace:*",
+		"@tradedeck/secrets": "workspace:*"
+	}
+}

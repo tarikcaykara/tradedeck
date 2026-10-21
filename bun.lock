@@ -1,0 +1,88 @@
+{
+  "lockfileVersion": 2,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "tradedeck",
+    },
+    "apps/cli": {
+      "name": "@tradedeck/cli",
+      "version": "0.0.0",
+      "dependencies": {
+        "@tradedeck/adapter": "workspace:*",
+        "@tradedeck/binance": "workspace:*",
+        "@tradedeck/core": "workspace:*",
+        "@tradedeck/db": "workspace:*",
+        "@tradedeck/secrets": "workspace:*",
+      },
+    },
+    "apps/server": {
+      "name": "@tradedeck/server",
+      "version": "0.0.0",
+      "dependencies": {
+        "@tradedeck/adapter": "workspace:*",
+        "@tradedeck/binance": "workspace:*",
+        "@tradedeck/core": "workspace:*",
+        "@tradedeck/db": "workspace:*",
+        "@tradedeck/secrets": "workspace:*",
+      },
+    },
+    "apps/web": {
+      "name": "@tradedeck/web",
+      "version": "0.0.0",
+      "dependencies": {
+        "@tradedeck/core": "workspace:*",
+      },
+    },
+    "packages/adapter": {
+      "name": "@tradedeck/adapter",
+      "version": "0.0.0",
+      "dependencies": {
+        "@tradedeck/core": "workspace:*",
+      },
+    },
+    "packages/binance": {
+      "name": "@tradedeck/binance",
+      "version": "0.0.0",
+      "dependencies": {
+        "@tradedeck/adapter": "workspace:*",
+        "@tradedeck/core": "workspace:*",
+      },
+    },
+    "packages/core": {
+      "name": "@tradedeck/core",
+      "version": "0.0.0",
+    },
+    "packages/db": {
+      "name": "@tradedeck/db",
+      "version": "0.0.0",
+      "dependencies": {
+        "@tradedeck/core": "workspace:*",
+      },
+    },
+    "packages/secrets": {
+      "name": "@tradedeck/secrets",
+      "version": "0.0.0",
+      "dependencies": {
+        "@tradedeck/core": "workspace:*",
+      },
+    },
+  },
+  "packages": {
+    "@tradedeck/adapter": ["@tradedeck/adapter@workspace:packages/adapter"],
+
+    "@tradedeck/binance": ["@tradedeck/binance@workspace:packages/binance"],
+
+    "@tradedeck/cli": ["@tradedeck/cli@workspace:apps/cli"],
+
+    "@tradedeck/core": ["@tradedeck/core@workspace:packages/core"],
+
+    "@tradedeck/db": ["@tradedeck/db@workspace:packages/db"],
+
+    "@tradedeck/secrets": ["@tradedeck/secrets@workspace:packages/secrets"],
+
+    "@tradedeck/server": ["@tradedeck/server@workspace:apps/server"],
+
+    "@tradedeck/web": ["@tradedeck/web@workspace:apps/web"],
+  }
+}
