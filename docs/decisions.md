@@ -153,3 +153,19 @@ reviews and merges those. Every PR first gets a review pass by an agent that did
   usually do not.
 - The reviewer-agent pass catches what it can before the owner reads the PR; it does not replace
   his review.
+
+## 2026-10-22 — Strict Zod schemas define the core types
+
+**Context:** Hand-written interfaces next to Zod schemas drift apart. `decimal.js` accepts strings
+such as `1e5`, `NaN` and `.5`, so "a decimal string" needs one definition. A credential spread into
+a delta by mistake would otherwise ride along to the browser unnoticed.
+
+**Decision:** Every domain and protocol type in `packages/core` is `z.infer` of a `z.strictObject`
+schema; decimal strings match `^-?\d+(\.\d+)?$`. Internal decimal arithmetic uses a cloned
+`decimal.js` constructor with 64 significant digits, never the global one.
+
+**Consequences:**
+- An unknown key is a validation error, not silently dropped. Server and web ship from one repo, so
+  there is no version skew to tolerate.
+- An adapter must convert a venue value in exponent notation to plain decimal before it crosses a
+  boundary.

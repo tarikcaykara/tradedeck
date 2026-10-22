@@ -82,8 +82,10 @@ the clock as a parameter; that is what lets `apps/web` import it.
 ## 4. Domain model
 
 Implemented in `packages/core` (M1 issue 2). Every price, quantity and money amount is a decimal
-**string**; arithmetic happens in `decimal.js`, never on JS numbers. Absent values are `null` end
-to end and render as "—" — never a zero placeholder.
+**string** matching `^-?\d+(\.\d+)?$` (no exponent, `+` or bare dot); arithmetic happens in
+`decimal.js`, never on JS numbers. Absent values are `null` end to end and render as "—" — never a
+zero placeholder. Each type below is inferred from a strict Zod schema of the same name plus
+`Schema` (`Position` ← `PositionSchema`); an unknown key fails validation.
 
 ```ts
 type Venue = 'binance';                       // grows per venue package
@@ -101,7 +103,8 @@ type QtyRule = { step: string; marketStep: string; minQty: string };
 
 // Rules are plain data so they serialize to the UI. Core exports:
 //   roundPrice(rule, price, side)  buy → round down, sell → round up:
-//                                  the user never pays worse than typed
+//                                  the user never pays worse than typed;
+//                                  throws if a buy would round to zero
 //   roundQty(rule, qty)            always round down
 //   notional(qty, price)
 
@@ -133,7 +136,7 @@ interface Position {
   instrumentId: InstrumentId;
   side: 'long' | 'short';
   positionSide: 'both' | 'long' | 'short';  // 'both' = one-way mode
-  size: string;                             // always positive; direction is `side`
+  size: string;                             // never negative; direction is `side`
   entryPrice: string;
   markPrice: string;
   liquidationPrice: string | null;
@@ -186,6 +189,13 @@ interface AccountSnapshot {
   fetchedAt: number;
 }
 
+interface PriceUpdate {                     // subscribePrices callback and the `price` message
+  instrumentId: InstrumentId;
+  price: string;
+  kind: 'mark' | 'last';                    // futures mark, spot last
+  ts: number;
+}
+
 type AccountStatus = 'connecting' | 'live' | 'resyncing' | 'down';
 ```
 
@@ -210,10 +220,7 @@ interface ExchangeAdapter {
     onFill(f: Fill): void;
     onStatus(s: AccountStatus): void;
   }): () => void;                                         // returns unsubscribe
-  subscribePrices(
-    instrumentIds: InstrumentId[],
-    onPrice: (p: { instrumentId: InstrumentId; price: string; kind: 'mark' | 'last'; ts: number }) => void,
-  ): () => void;
+  subscribePrices(instrumentIds: InstrumentId[], onPrice: (p: PriceUpdate) => void): () => void;
   fetchFills(instrumentId: InstrumentId, sinceTs: number): Promise<Fill[]>;
 
   // ── M2: trade ─────────────────────────────────────────────────────────
@@ -337,7 +344,7 @@ parses what it receives with the same schemas.
     | { type: 'position'; position: Position }
     | { type: 'order'; order: Order }
     | { type: 'fill'; fill: Fill }
-    | { type: 'price'; instrumentId: InstrumentId; price: string; kind: 'mark' | 'last'; ts: number }
+    | ({ type: 'price' } & PriceUpdate)
     | { type: 'account_status'; accountId: string; status: AccountStatus };
   ```
 
