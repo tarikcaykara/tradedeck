@@ -5,6 +5,7 @@ import type { OrderSide, PriceRule, QtyRule } from "./domain.ts";
 /**
  * Rounds a positive price onto the instrument's price grid: buy rounds down,
  * sell rounds up, so the user never pays more or receives less than typed.
+ * Throws if a buy price below the first grid step would round to zero.
  */
 export function roundPrice(
 	rule: PriceRule,
@@ -14,12 +15,22 @@ export function roundPrice(
 	const p = parseDecimal("price", price);
 	if (p.lte(0)) throw new RangeError("price must be positive");
 	const rm = side === "buy" ? Decimal.ROUND_FLOOR : Decimal.ROUND_CEIL;
+	const rounded = toPriceGrid(rule, p, rm);
+	if (rounded.isZero()) throw new RangeError("price rounds to zero");
+	return formatDecimal(rounded);
+}
+
+function toPriceGrid(
+	rule: PriceRule,
+	p: Decimal,
+	rm: Decimal.Rounding,
+): Decimal {
 	switch (rule.kind) {
 		case "tick": {
 			const t = parseDecimal("tick", rule.tick);
 			if (t.lte(0)) throw new RangeError("tick must be positive");
 			// `toNearest` ignores `precision`, so the result is exact.
-			return formatDecimal(p.toNearest(t, rm));
+			return p.toNearest(t, rm);
 		}
 		case "sigfig": {
 			const { sigFigs, maxDecimals } = rule;
@@ -35,7 +46,7 @@ export function roundPrice(
 			// into the next band only lowers the figures needed. Clamping at 0
 			// keeps integer prices valid.
 			const dp = Math.max(0, Math.min(maxDecimals, sigFigs - 1 - p.e));
-			return formatDecimal(p.toDecimalPlaces(dp, rm));
+			return p.toDecimalPlaces(dp, rm);
 		}
 	}
 }
@@ -49,7 +60,7 @@ export function roundQty(rule: QtyRule, qty: string): string {
 	return formatDecimal(q.toNearest(s, Decimal.ROUND_DOWN));
 }
 
-/** Exact `qty × price`, unrounded. */
+/** `qty × price`, unrounded: exact up to 64 significant digits. */
 export function notional(qty: string, price: string): string {
 	return formatDecimal(
 		parseDecimal("qty", qty).times(parseDecimal("price", price)),

@@ -103,7 +103,8 @@ type QtyRule = { step: string; marketStep: string; minQty: string };
 
 // Rules are plain data so they serialize to the UI. Core exports:
 //   roundPrice(rule, price, side)  buy → round down, sell → round up:
-//                                  the user never pays worse than typed
+//                                  the user never pays worse than typed;
+//                                  throws if a buy would round to zero
 //   roundQty(rule, qty)            always round down
 //   notional(qty, price)
 
@@ -135,7 +136,7 @@ interface Position {
   instrumentId: InstrumentId;
   side: 'long' | 'short';
   positionSide: 'both' | 'long' | 'short';  // 'both' = one-way mode
-  size: string;                             // always positive; direction is `side`
+  size: string;                             // never negative; direction is `side`
   entryPrice: string;
   markPrice: string;
   liquidationPrice: string | null;

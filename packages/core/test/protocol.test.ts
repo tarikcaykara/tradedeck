@@ -15,7 +15,8 @@ import {
 	StateSnapshotSchema,
 } from "../src/protocol.ts";
 
-// Typed fixtures: `bun run typecheck` proves the inferred shapes match §4.
+// Typed fixtures: `bun run typecheck` proves each sample conforms to the
+// inferred types.
 const ts = 1_760_000_000_000;
 
 const instrument: Instrument = {
@@ -160,6 +161,10 @@ describe("ServerMessageSchema", () => {
 		[
 			"position without liquidationPrice (absent is not null)",
 			{ type: "position", position: positionWithoutLiquidation },
+		],
+		[
+			"position with a signed (negative) size",
+			{ type: "position", position: { ...position, size: "-0.01" } },
 		],
 		[
 			"order with an unknown status",

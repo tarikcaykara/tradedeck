@@ -72,6 +72,21 @@ describe("rule errors", () => {
 			"price must be positive",
 		],
 		[
+			"negative price",
+			() => roundPrice(tick("0.01"), "-1", "sell"),
+			"price must be positive",
+		],
+		[
+			"buy below one tick",
+			() => roundPrice(tick("0.01"), "0.005", "buy"),
+			"price rounds to zero",
+		],
+		[
+			"buy below the sigfig grid",
+			() => roundPrice(sigfig(6), "0.0000004", "buy"),
+			"price rounds to zero",
+		],
+		[
 			"zero tick",
 			() => roundPrice(tick("0"), "1", "buy"),
 			"tick must be positive",
@@ -86,6 +101,12 @@ describe("rule errors", () => {
 			() =>
 				roundPrice({ kind: "sigfig", sigFigs: 0, maxDecimals: 6 }, "1", "buy"),
 			"sigFigs must be a positive integer",
+		],
+		[
+			"negative maxDecimals",
+			() =>
+				roundPrice({ kind: "sigfig", sigFigs: 5, maxDecimals: -1 }, "1", "buy"),
+			"maxDecimals must be a non-negative integer",
 		],
 		[
 			"negative qty",

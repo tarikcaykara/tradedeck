@@ -131,8 +131,14 @@ export const PositionSchema = z.strictObject({
 	instrumentId: InstrumentIdSchema,
 	side: z.enum(["long", "short"]),
 	positionSide: PositionSideSchema,
-	/** Always positive; the direction is `side`. */
-	size: DecimalStringSchema,
+	/**
+	 * Never negative; the direction is `side`. "0" is a closed position (§6).
+	 * A signed venue amount (Binance `positionAmt`) must be split by the adapter.
+	 */
+	size: DecimalStringSchema.refine(
+		(s) => !s.startsWith("-"),
+		"size must not be negative",
+	),
 	entryPrice: DecimalStringSchema,
 	markPrice: DecimalStringSchema,
 	liquidationPrice: DecimalStringSchema.nullable(),

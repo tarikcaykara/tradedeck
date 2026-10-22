@@ -13,3 +13,14 @@ test.each<["long" | "short", string, string, string, string]>([
 		expect(unrealizedPnl({ side, entryPrice, markPrice, size })).toBe(result);
 	},
 );
+
+test("a negative size is rejected, not sign-flipped", () => {
+	expect(() =>
+		unrealizedPnl({
+			side: "short",
+			entryPrice: "3000",
+			markPrice: "2950.25",
+			size: "-2",
+		}),
+	).toThrow(new RangeError("size must not be negative"));
+});
