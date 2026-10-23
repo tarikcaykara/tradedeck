@@ -124,15 +124,14 @@ export function createRestClient(opts: {
 				res = await fetchImpl(url, { method: req.method, headers, signal });
 				body = await res.text();
 			} catch (err) {
-				// The cause is not attached: Bun's fetch errors carry the full URL,
-				// signature included, in a `path` property.
+				// Neither the rejection's message nor the error itself is kept: a
+				// fetch error may carry the full URL, signature included (Bun puts it
+				// in a `path` property). Only a system error code such as
+				// `ECONNREFUSED` is passed on.
 				if (signal.aborted) {
 					throw fail("timeout", `no response within ${timeoutMs} ms`);
 				}
-				throw fail(
-					"network",
-					err instanceof Error ? err.message : "fetch failed",
-				);
+				throw fail("network", `fetch failed${systemCode(err)}`);
 			}
 
 			if (!res.ok) {
@@ -189,4 +188,15 @@ function retryAfterMs(res: Response): number | null {
 	if (header === undefined || header === "") return null;
 	const seconds = Number(header);
 	return Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : null;
+}
+
+/** ` (ECONNREFUSED)` when the error has a code that is a bare identifier, else empty. */
+function systemCode(err: unknown): string {
+	const code =
+		typeof err === "object" && err !== null && "code" in err
+			? err.code
+			: undefined;
+	return typeof code === "string" && /^[A-Za-z0-9_]{1,40}$/.test(code)
+		? ` (${code})`
+		: "";
 }

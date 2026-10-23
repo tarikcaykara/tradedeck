@@ -319,13 +319,15 @@ venue: base URLs, the API-key header and the server-time endpoint come from the 
   venue package.
 - **`VenueError`**: `kind` (`http` | `network` | `timeout` | `decode`), `method`, the bare `path`,
   `status`, the venue `code` as a string and `retryAfterMs` (from `Retry-After` on 429/418). Neither
-  the message nor any field carries the query, headers, API key or signature. A `timeout` leaves
-  the outcome unknown.
+  the message nor any field carries the query, headers, API key or signature: a `network` error
+  keeps only the system error code (e.g. `ECONNREFUSED`), never the fetch error's message or the
+  error itself. A `timeout` leaves the outcome unknown.
 - **No automatic retries** anywhere in the transport; the caller decides (hard rule 5, and Binance
   requires backing off after a 429).
 - **Server clock** (`createServerClock`): offset = server time − midpoint of the local request
   window. It resyncs after `maxAgeMs` (default 30 min) or `invalidate()` (e.g. on Binance `-1021`);
-  concurrent callers share one sync, and a failed sync leaves the clock unsynced.
+  concurrent callers share one sync, a sync already in flight when `invalidate()` runs does not
+  count, and a failed sync leaves the clock unsynced.
 - **Reconnecting socket** (`createReconnectingSocket`): injectable `WebSocket`, clock and random;
   the URL is resolved again before every connect (a fresh listen key); statuses `connecting` /
   `open` / `closed` with `retryInMs`. The delay uses equal jitter: `cap = min(maxDelay, initialDelay

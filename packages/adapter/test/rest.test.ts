@@ -220,6 +220,28 @@ describe("server clock", () => {
 		expect(await clock.timestamp()).toBe(1_000_300);
 		expect(calls).toBe(2);
 	});
+
+	test("invalidate() during a pending sync waits for a sync started after it", async () => {
+		const replies: Array<(serverTime: number) => void> = [];
+		const clock = createServerClock({
+			now: () => 1_000_000,
+			fetchServerTime: () => {
+				const { promise, resolve } = Promise.withResolvers<number>();
+				replies.push(resolve);
+				return promise;
+			},
+		});
+		const before = clock.timestamp();
+		clock.invalidate();
+		const after = clock.timestamp();
+		expect(replies).toHaveLength(2);
+		replies[0]?.(1_000_100);
+		replies[1]?.(1_000_900);
+		expect(await before).toBe(1_000_900);
+		expect(await after).toBe(1_000_900);
+		expect(await clock.timestamp()).toBe(1_000_900);
+		expect(replies).toHaveLength(2);
+	});
 });
 
 describe("unsigned requests", () => {
@@ -339,15 +361,19 @@ describe("errors", () => {
 		expect(err.message).toBe("GET /api/v3/account → 503: Service Unavailable");
 	});
 
-	test("rejected fetch → network", async () => {
-		const err = await failure(() => {
-			throw new TypeError("Unable to connect");
-		});
+	test.each([
+		[
+			Object.assign(new TypeError("ECONNREFUSED: Unable to connect"), {
+				code: "ECONNREFUSED",
+			}),
+			"fetch failed (ECONNREFUSED)",
+		],
+		[new TypeError("Unable to connect"), "fetch failed"],
+	])("rejected fetch → network (%s)", async (rejection, text) => {
+		const err = await failure(() => Promise.reject(rejection));
 		expect(err.kind).toBe("network");
 		expect(err.status).toBeNull();
-		expect(err.message).toBe(
-			"GET /api/v3/account → network: Unable to connect",
-		);
+		expect(err.message).toBe(`GET /api/v3/account → network: ${text}`);
 	});
 
 	test("no response within timeoutMs → timeout", async () => {
@@ -366,8 +392,14 @@ describe("errors", () => {
 
 	test.each([
 		["http", () => Response.json({ code: -1022, msg: "bad" }, { status: 400 })],
-		["network", () => Promise.reject(new TypeError("down"))],
-		["timeout", neverAnswers],
+		[
+			"network",
+			(url: string) =>
+				Promise.reject(
+					Object.assign(new TypeError(`cannot reach ${url}`), { path: url }),
+				),
+		],
+		["timeout", (_: string, init: RequestInit) => neverAnswers(init)],
 		["decode", () => new Response("not json")],
 	] as const)(
 		"%s: the message carries no signature, key or timestamp",
@@ -377,7 +409,7 @@ describe("errors", () => {
 				baseUrl: BASE,
 				fetch: async (u, init) => {
 					url = u;
-					return respond(init);
+					return respond(u, init);
 				},
 				signer: hmac,
 				apiKeyHeader: HEADER,
