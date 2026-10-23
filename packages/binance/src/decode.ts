@@ -1,5 +1,5 @@
 import { VenueError } from "@tradedeck/adapter";
-import type { z } from "zod";
+import { z } from "zod";
 import type { Endpoint } from "./endpoints.ts";
 
 /**
@@ -24,5 +24,24 @@ export function decode<T>(
 		code: null,
 		retryAfterMs: null,
 		text: `unexpected response at ${at === "" ? "<root>" : at}: ${issue?.message ?? "invalid"}`,
+	});
+}
+
+/**
+ * A venue enum mapped to its domain value. A value missing from `map` is a
+ * decode error naming it, so a new Binance value surfaces instead of being
+ * guessed at.
+ */
+export function venueEnum<const M extends Readonly<Record<string, unknown>>>(
+	map: M,
+	what: string,
+) {
+	return z.string().transform((value, ctx): M[keyof M] => {
+		if (Object.hasOwn(map, value)) return map[value as keyof M];
+		ctx.addIssue({
+			code: "custom",
+			message: `unknown ${what} "${value.slice(0, 40)}"`,
+		});
+		return z.NEVER;
 	});
 }
