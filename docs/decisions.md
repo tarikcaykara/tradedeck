@@ -169,3 +169,27 @@ schema; decimal strings match `^-?\d+(\.\d+)?$`. Internal decimal arithmetic use
   there is no version skew to tolerate.
 - An adapter must convert a venue value in exponent notation to plain decimal before it crosses a
   boundary.
+
+## 2026-10-23 — Adapter transport: query-signed REST, no retries, stable-reset backoff
+
+**Context:** M1 issue 4 (#5) adds the shared transport under every venue adapter. Only Binance signs
+in the query string today; Bybit signs in headers, Hyperliquid and Lighter sign with a wallet or a
+WASM signer (`docs/venues/upcoming.md`). Order requests have unknown outcomes on timeouts and 5xx
+(hard rule 5), and Binance requires backing off after a 429.
+
+**Decision:**
+- The REST client implements the query-signed scheme only. Venue constants (base URL, API-key
+  header, server-time fetcher) are parameters, and the package names no venue. Bybit's header
+  scheme is added with Bybit (M4); there is no signing-scheme abstraction until then.
+- The transport never retries a request; the caller decides.
+- Every request has a timeout (default 10 s) surfaced as error kind `timeout`, distinct from a
+  rejection, so a hung venue cannot keep an account `connecting` and the M2 OrderRouter can tell an
+  unknown outcome from a refusal.
+- The socket backoff resets only after a connection stayed open for `stableAfterMs` (default 30 s),
+  not on the first message: a private user-data stream is legitimately silent, and detecting a
+  silently dead stream belongs to the resync (M1 issue 7).
+
+**Consequences:**
+- Venue packages own retries, `-1021` resyncs (`ServerClock.invalidate()`) and response schemas.
+- A socket that keeps connecting and dropping keeps backing off up to the cap.
+- A second signing scheme means a second client or an abstraction then, not now.

@@ -37,6 +37,26 @@ endpoint paths, weights and doc links only — tradedeck does not depend on it).
   `CredentialReport` mapping: `docs/architecture.md` §5.
 - **Key expiry:** unverified — see Unverified.
 
+## Signing
+
+Source: https://github.com/binance/binance-spot-api-docs/blob/master/rest-api.md, "SIGNED Endpoint
+Examples for POST /api/v3/order" (verified 2026-10-23). Implemented by the adapter transport
+(`docs/architecture.md` §5, Transport).
+
+- **Payload:** the query string concatenated with the request body, with every non-ASCII character
+  percent-encoded before signing. tradedeck sends every parameter in the query and no body, so the
+  payload is the transmitted query up to `&signature=`. The API key goes in the `X-MBX-APIKEY`
+  header.
+- **Encodings:** HMAC-SHA256 → hex. Ed25519 → base64, sent percent-encoded as the `signature`
+  value (`+` → `%2B`, `/` → `%2F`, `=` → `%3D`).
+- **Test vectors:** both HMAC examples of the doc (the ASCII `LTCBTC` request → `c8db5682…6b71`
+  and the non-ASCII `１２３４５６` request → `e1353ec6…3ef3`) reproduce byte for byte in
+  `packages/adapter/test/rest.test.ts`. The doc's Ed25519 example signature decodes to 256 bytes —
+  the size of an RSA-2048 signature; an Ed25519 signature is 64 bytes — and its private key is not
+  published, so RFC 8032 §7.1 TEST 2 is the Ed25519 vector instead.
+- **Rate-limit responses:** 429 and 418 carry a `Retry-After` header in **seconds**; error bodies
+  are `{ "code": <int>, "msg": <string> }` (same doc, "LIMITS" and "Error Codes").
+
 ## Environments
 
 | Environment | Spot REST | Spot WS API | Spot market streams | USDⓈ-M REST | USDⓈ-M streams |
