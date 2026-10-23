@@ -35,6 +35,16 @@ endpoint paths, weights and doc links only — tradedeck does not depend on it).
   https://developers.binance.com/en/docs/catalog/core-trading-wallet/api/rest-api/account#get-api-key-permission
   (fields from `[SDK]` `clients/wallet/src/rest-api/types/get-api-key-permission-response.ts`).
   `CredentialReport` mapping: `docs/architecture.md` §5.
+- **Demo has no `/sapi` (verified 2026-10-23):** `GET https://demo-api.binance.com/sapi/v1/account/apiRestrictions`
+  answers an nginx `404` HTML page, while `/api/v3/account` on the same host answers Binance JSON
+  errors. So the Demo credential check (M1 issue 6) reads `GET /api/v3/account` and
+  `GET /fapi/v1/accountConfig` instead:
+  - `canRead` = the signed reads succeeded;
+  - `canTradeSpot` = spot `canTrade`, `canTradeDerivs` = futures `canTrade`;
+  - `canWithdraw` = spot `canWithdraw` OR futures `canWithdraw`;
+  - `ipRestricted` = `false` (not observable without `/sapi`).
+
+  `[INFERENCE]` these flags may describe the account rather than the key.
 - **Key expiry:** unverified — see Unverified.
 
 ## Signing
@@ -229,10 +239,23 @@ deprecated on 2024-07-24 with no date `[FC]`.
   `PRICE_FILTER`, `LOT_SIZE`, `MARKET_LOT_SIZE`; `MIN_NOTIONAL` has a single `notional` field and
   uses mark price for market orders; `PERCENT_PRICE` is relative to mark price; `MAX_NUM_ORDERS`.
   The futures lot-size rule is `(qty − minQty) % stepSize`, the spot rule `qty % stepSize`.
-- **Mapping to `Instrument`:** `priceRule = { kind: 'tick', tick: PRICE_FILTER.tickSize }`;
-  `qtyRule.step = LOT_SIZE.stepSize`, `qtyRule.marketStep = MARKET_LOT_SIZE.stepSize`,
-  `qtyRule.minQty = LOT_SIZE.minQty`; `minNotional` = spot `NOTIONAL.minNotional` (or
-  `MIN_NOTIONAL`), futures `MIN_NOTIONAL.notional`.
+- **Mapping to `Instrument`** (implemented in M1 issue 6):
+  - `priceRule = { kind: 'tick', tick: PRICE_FILTER.tickSize }`; `qtyRule.step = LOT_SIZE.stepSize`,
+    `qtyRule.minQty = LOT_SIZE.minQty`; `minNotional` = spot `NOTIONAL.minNotional` (or the legacy
+    `MIN_NOTIONAL.minNotional`), futures `MIN_NOTIONAL.notional`; futures `settle = marginAsset`.
+  - `qtyRule.marketStep = MARKET_LOT_SIZE.stepSize` when present and non-zero, else
+    `LOT_SIZE.stepSize`. Demo spot `exchangeInfo` on 2026-10-23: 3662 of 3736 symbols report
+    `MARKET_LOT_SIZE.stepSize = "0.00000000"` and 74 omit the filter; no non-zero value differs
+    from `LOT_SIZE`. Every futures symbol has a non-zero value; one differed (`ARKUSDT`: lot 3,
+    market 1).
+  - Only `TRADING` symbols: spot asks with `symbolStatus=TRADING` (5.95 MB / 1383 symbols instead
+    of 17.8 MB / 3736, most of the rest `BREAK`); futures has no such parameter and is filtered
+    client-side (604 of 742 on Demo). A symbol with a zero or missing tick, step, minimum quantity
+    or minimum notional is dropped (seen once: a `PENDING_TRADING` futures symbol with tick `0`).
+    Positions and orders on a dropped symbol still map — they need only its `InstrumentId`.
+  - Futures `maxLeverage` = bracket 1 `initialLeverage` from `GET /fapi/v1/leverageBracket`
+    (signed; all bracket values are JSON numbers).
+  - Symbols are not ASCII-only: both markets list e.g. `币安人生USDT`.
 
 ## Rate limits & idempotency
 
@@ -285,8 +308,6 @@ Carried from research; each item names where it gets settled.
   90 days; the 2021 validity-period announcement was marked no longer applicable on 2023-10-24
   (https://www.binance.com/en/support/announcement/detail/11e4c2f44e7a47b9b5fc0e479c0b256f).
   `doctor` (M1 issue 13) surfaces a failing credential either way.
-- **Demo + `/sapi`:** the Demo docs list only `/api` hosts; whether
-  `/sapi/v1/account/apiRestrictions` works on Demo is unknown — M1 issue 6.
 - **Demo + self-generated Ed25519 keys:** unknown; if refused, M1 issue 9 keeps `--kind hmac` for
   Demo accounts and this file records it.
 - **Demo futures stream paths:** whether `demo-fstream` uses the same `/private/ws/<listenKey>`
@@ -297,7 +318,7 @@ Carried from research; each item names where it gets settled.
 - **Spot `REQUEST_WEIGHT` per minute:** read from `/api/v3/exchangeInfo` at runtime.
 - **`enableInternalTransfer` / `permitsUniversalTransfer`:** whether either lets funds leave the
   owner's accounts; M1 issue 9 decides whether they are refused like withdrawals.
-- **`MARKET_LOT_SIZE.stepSize` of `0`:** whether it occurs, and if so whether `marketStep` falls
-  back to `LOT_SIZE.stepSize` — M1 issue 6.
 - **Commission endpoint response fields** (spot and futures) — M2.
+- **`symbolStatus=TRADING` on live spot `exchangeInfo`:** documented and verified on Demo only;
+  live is never called from development.
 - **Removal date** of the deprecated spot REST listenKey endpoints — none announced.

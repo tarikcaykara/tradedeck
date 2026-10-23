@@ -193,3 +193,29 @@ WASM signer (`docs/venues/upcoming.md`). Order requests have unknown outcomes on
 - Venue packages own retries, `-1021` resyncs (`ServerClock.invalidate()`) and response schemas.
 - A socket that keeps connecting and dropping keeps backing off up to the cap.
 - A second signing scheme means a second client or an abstraction then, not now.
+
+## 2026-10-23 — Binance REST adapter: loud decode failures, one `-1021` retry, Demo-only recordings
+
+**Context:** M1 issue 6 (#7) maps Binance REST responses to the domain. Binance adds fields and
+enum values over time; a terminal that silently drops an open order it cannot map misleads the
+user. Tests replay recorded responses (hard rule 9), and the repo is public.
+
+**Decision:**
+- Venue responses are parsed with loose Zod objects (unknown fields ignored). An unknown enum value
+  or a shape mismatch is a `VenueError` of kind `decode` naming the endpoint and field: the
+  snapshot fails and the account shows `down`, instead of dropping the item. Instruments are the
+  exception: a symbol whose rules are unusable is left out, because it cannot be traded anyway.
+- `-1021` (timestamp outside `recvWindow`) resyncs the server clock and retries the request
+  exactly once. It is a definite rejection before processing; no other error is retried.
+- Recordings come only from Binance Demo, through `bun run record:binance`. It sends exactly the
+  adapter's endpoint table, takes the key from hidden prompts and never stores it, drops the auth
+  params and headers, scrubs identifying values (`uid`, `accountAlias`, `apiKey`, …) and trims
+  per-symbol lists. A test guards every committed recording.
+- Futures time-in-force `GTD` gets its own domain value `gtd`; `RPI` maps to `post_only`.
+
+**Consequences:**
+- A new Binance enum value takes an account `down` until the mapping is extended; the error names
+  the value.
+- The live credential check (`/sapi`) has no recording: Demo does not serve `/sapi`, and live is
+  never called. Its test uses Binance's documented response shape.
+- Re-recording after a Binance change is one owner-run command.

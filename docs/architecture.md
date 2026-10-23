@@ -276,13 +276,19 @@ interface KindCapabilities {
   conditionalOrders: 'inline' | 'separate_api' | 'none';
 }
 
+// The members M1 has implemented so far; it widens to ExchangeAdapter once
+// subscribe (M1 issue 7), subscribePrices (8) and fetchFills (12) land.
+type BinanceAdapter = Pick<ExchangeAdapter,
+  'venue' | 'capabilities' | 'verifyCredential' | 'loadInstruments' | 'fetchSnapshot'>;
+
 declare function createBinanceAdapter(opts: {
+  accountId: string;              // stamped on every balance, position and order
   environment: Environment;
   credential: Credential;
-  fetch?: typeof fetch;           // injected in tests
-  WebSocket?: typeof WebSocket;   // injected in tests
+  fetch?: Fetch;                  // injected in tests; (url, init) => Promise<Response>
   now?: () => number;             // injected clock
-}): ExchangeAdapter;
+  // WebSocket? is added by M1 issue 7, the first member that opens a socket.
+}): BinanceAdapter;
 ```
 
 Binance values:
@@ -292,11 +298,13 @@ Binance values:
 | `spot` | `qty_down_or_cancel_replace` | `per_symbol` | `emulated` | `false` | 1 | `inline` |
 | `linear` | `limit_only` | `per_symbol` | `emulated` | `true` | 5 | `separate_api` |
 
-Binance `verifyCredential()` reads `GET /sapi/v1/account/apiRestrictions` and maps `enableReading`
-→ `canRead`, `enableSpotAndMarginTrading` → `canTradeSpot`, `enableFutures` → `canTradeDerivs`,
-`enableWithdrawals` → `canWithdraw`, `ipRestrict` → `ipRestricted`. The Demo docs list only `/api`
-hosts, so whether Demo serves this `/sapi` endpoint is unverified; M1 issue 6 settles the Demo path
-(`docs/venues/binance.md`, Unverified).
+Binance `verifyCredential()` on `live` reads `GET /sapi/v1/account/apiRestrictions` and maps
+`enableReading` → `canRead`, `enableSpotAndMarginTrading` → `canTradeSpot`, `enableFutures` →
+`canTradeDerivs`, `enableWithdrawals` → `canWithdraw`, `ipRestrict` → `ipRestricted`. Every field
+is optional in Binance's own types: a missing `enableWithdrawals` counts as `true`, so `keys add`
+refuses the key, and any other missing flag counts as `false`. Demo serves no `/sapi` (404), so
+on `demo` the report comes from `GET /api/v3/account` and `GET /fapi/v1/accountConfig`
+(`docs/venues/binance.md`, Credential check).
 
 The terminal composes what a venue lacks from the capability flags — e.g. close-all as one
 reduce-only order per position, cancel-all as one call per symbol — instead of each adapter
