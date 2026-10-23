@@ -66,7 +66,14 @@ export const OrderStatusSchema = z.enum([
 ]);
 export type OrderStatus = z.infer<typeof OrderStatusSchema>;
 
-export const TimeInForceSchema = z.enum(["gtc", "ioc", "fok", "post_only"]);
+/** `gtd`: Binance futures Good-Till-Date, an order that expires at a set time. */
+export const TimeInForceSchema = z.enum([
+	"gtc",
+	"ioc",
+	"fok",
+	"post_only",
+	"gtd",
+]);
 export type TimeInForce = z.infer<typeof TimeInForceSchema>;
 
 export const AccountStatusSchema = z.enum([

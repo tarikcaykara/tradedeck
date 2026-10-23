@@ -161,7 +161,7 @@ interface Order {
   price: string | null;
   triggerPrice: string | null;
   reduceOnly: boolean;
-  timeInForce: 'gtc' | 'ioc' | 'fok' | 'post_only';
+  timeInForce: 'gtc' | 'ioc' | 'fok' | 'post_only' | 'gtd';  // gtd: futures Good-Till-Date
   positionSide: 'both' | 'long' | 'short';
   createdAt: number;
   updatedAt: number;
