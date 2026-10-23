@@ -5,10 +5,12 @@
 	"type": "module",
 	"description": "keys add, list and remove; doctor.",
 	"dependencies": {
-		"@tradedeck/core": "workspace:*",
+		"@clack/prompts": "^1.8.1",
 		"@tradedeck/adapter": "workspace:*",
 		"@tradedeck/binance": "workspace:*",
+		"@tradedeck/core": "workspace:*",
 		"@tradedeck/db": "workspace:*",
-		"@tradedeck/secrets": "workspace:*"
+		"@tradedeck/secrets": "workspace:*",
+		"zod": "^4.6.7"
 	}
 }

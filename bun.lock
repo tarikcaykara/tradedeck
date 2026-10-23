@@ -20,6 +20,7 @@
         "@tradedeck/core": "workspace:*",
         "@tradedeck/db": "workspace:*",
         "@tradedeck/secrets": "workspace:*",
+        "zod": "^4.6.7",
       },
     },
     "apps/server": {
