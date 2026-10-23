@@ -302,6 +302,37 @@ The terminal composes what a venue lacks from the capability flags — e.g. clos
 reduce-only order per position, cancel-all as one call per symbol — instead of each adapter
 pretending to support it.
 
+### Transport
+
+`packages/adapter` also holds the venue-neutral transport the venue packages build on. It names no
+venue: base URLs, the API-key header and the server-time endpoint come from the venue package.
+
+- **Signer** (`createSigner(credential)`): HMAC-SHA256 → lowercase hex; Ed25519 → base64 over the
+  UTF-8 payload. The PEM is parsed once; an unparseable or non-Ed25519 PEM throws a fixed message
+  that echoes no key material. The secret lives only in a closure, so no property of a signer
+  carries it.
+- **REST client** (`createRestClient`): query-signed scheme — every parameter in the query string,
+  no body. A `signed` request appends `recvWindow` (default 5000) and `timestamp` from the server
+  clock, signs that exact query and appends the percent-encoded `signature`; an `apiKey` request
+  sends only the key header. `fetch` is injectable. Each request times out after 10 s by default,
+  response body included. The parsed JSON is returned as `unknown`; Zod validation belongs to the
+  venue package.
+- **`VenueError`**: `kind` (`http` | `network` | `timeout` | `decode`), `method`, the bare `path`,
+  `status`, the venue `code` as a string and `retryAfterMs` (from `Retry-After` on 429/418). Neither
+  the message nor any field carries the query, headers, API key or signature. A `timeout` leaves
+  the outcome unknown.
+- **No automatic retries** anywhere in the transport; the caller decides (hard rule 5, and Binance
+  requires backing off after a 429).
+- **Server clock** (`createServerClock`): offset = server time − midpoint of the local request
+  window. It resyncs after `maxAgeMs` (default 30 min) or `invalidate()` (e.g. on Binance `-1021`);
+  concurrent callers share one sync, and a failed sync leaves the clock unsynced.
+- **Reconnecting socket** (`createReconnectingSocket`): injectable `WebSocket`, clock and random;
+  the URL is resolved again before every connect (a fresh listen key); statuses `connecting` /
+  `open` / `closed` with `retryInMs`. The delay uses equal jitter: `cap = min(maxDelay, initialDelay
+  × 2^attempt)`, delay uniform in `[cap/2, cap]` (defaults 1 s and 30 s). The backoff resets only
+  after a connection stayed open `stableAfterMs` (default 30 s): a private stream may be silent for
+  long, and detecting a silently dead stream belongs to the resync (§6). `close()` is final.
+
 ## 6. Streaming & state
 
 - Session start (per account): `fetchSnapshot()`, then `subscribe()`. Status goes `connecting` →
