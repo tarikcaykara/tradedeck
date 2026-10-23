@@ -4,14 +4,24 @@ import { VenueError } from "../src/errors.ts";
 import { createRestClient, type Fetch, type RestRequest } from "../src/rest.ts";
 import { createSigner } from "../src/signer.ts";
 
-// Binance spot API docs, rest-api.md, "SIGNED Endpoint Examples" (HMAC).
+// Binance spot API docs, rest-api.md, "SIGNED Endpoint Examples" (HMAC): the
+// ASCII and the non-ASCII example requests, as the doc's curl URLs.
 const DOC_API_KEY =
 	"vmPUZE6mv9SD5VNHk4HlWFsOr6aKE2zvsw0MuIgwCIPy6utIco14y7Ju91duEh8A";
 const DOC_SECRET =
 	"NhqPtmdSJYdKjVHjA7PZj4Mge3R5YNiP1e3UZjInClVN65XAbvqqM6A7H5fATj0j";
-const DOC_SIGNATURE =
-	"c8db56825ae71d6d79447849e617115f4a920fa2acdcab2b053c4b2838bd6b71";
-const DOC_URL = `https://api.binance.com/api/v3/order?symbol=LTCBTC&side=BUY&type=LIMIT&timeInForce=GTC&quantity=1&price=0.1&recvWindow=5000&timestamp=1499827319559&signature=${DOC_SIGNATURE}`;
+const DOC_TAIL =
+	"&side=BUY&type=LIMIT&timeInForce=GTC&quantity=1&price=0.1&recvWindow=5000&timestamp=1499827319559";
+const DOC_REQUESTS = [
+	[
+		"LTCBTC",
+		`https://api.binance.com/api/v3/order?symbol=LTCBTC${DOC_TAIL}&signature=c8db56825ae71d6d79447849e617115f4a920fa2acdcab2b053c4b2838bd6b71`,
+	],
+	[
+		"１２３４５６",
+		`https://api.binance.com/api/v3/order?symbol=%EF%BC%91%EF%BC%92%EF%BC%93%EF%BC%94%EF%BC%95%EF%BC%96${DOC_TAIL}&signature=e1353ec6b14d888f1164ae9af8228a3dbd508bc82eb867db8ab6046442f33ef3`,
+	],
+] as const;
 
 // RFC 8032 §7.1, TEST 2, as PKCS#8.
 const RFC8032_PEM = [
@@ -72,34 +82,37 @@ function splitSigned(url: string): { query: string; signature: string } {
 }
 
 describe("signed requests", () => {
-	test("reproduce the Binance documentation request", async () => {
-		const { calls, fetch } = recorder();
-		const client = createRestClient({
-			baseUrl: "https://api.binance.com",
-			fetch,
-			signer: hmac,
-			apiKeyHeader: HEADER,
-			clock: fixedClock(1499827319559),
-			recvWindow: 5000,
-		});
-		await client.request({
-			method: "POST",
-			path: "/api/v3/order",
-			params: {
-				symbol: "LTCBTC",
-				side: "BUY",
-				type: "LIMIT",
-				timeInForce: "GTC",
-				quantity: "1",
-				price: "0.1",
-			},
-			auth: "signed",
-		});
-		expect(calls).toHaveLength(1);
-		expect(calls[0]?.url).toBe(DOC_URL);
-		expect(calls[0]?.method).toBe("POST");
-		expect(calls[0]?.headers.get(HEADER)).toBe(DOC_API_KEY);
-	});
+	test.each(DOC_REQUESTS)(
+		"reproduce the Binance documentation request for %s",
+		async (symbol, url) => {
+			const { calls, fetch } = recorder();
+			const client = createRestClient({
+				baseUrl: "https://api.binance.com",
+				fetch,
+				signer: hmac,
+				apiKeyHeader: HEADER,
+				clock: fixedClock(1499827319559),
+				recvWindow: 5000,
+			});
+			await client.request({
+				method: "POST",
+				path: "/api/v3/order",
+				params: {
+					symbol,
+					side: "BUY",
+					type: "LIMIT",
+					timeInForce: "GTC",
+					quantity: "1",
+					price: "0.1",
+				},
+				auth: "signed",
+			});
+			expect(calls).toHaveLength(1);
+			expect(calls[0]?.url).toBe(url);
+			expect(calls[0]?.method).toBe("POST");
+			expect(calls[0]?.headers.get(HEADER)).toBe(DOC_API_KEY);
+		},
+	);
 
 	test("percent-encode the base64 Ed25519 signature over the transmitted query", async () => {
 		const { calls, fetch } = recorder();
