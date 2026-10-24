@@ -1,0 +1,20 @@
+{
+	"request": {
+		"host": "futures",
+		"method": "GET",
+		"path": "/fapi/v1/accountConfig",
+		"params": {}
+	},
+	"status": 200,
+	"contentType": "application/json",
+	"body": {
+		"feeTier": 0,
+		"canTrade": true,
+		"canDeposit": true,
+		"canWithdraw": true,
+		"dualSidePosition": false,
+		"updateTime": 1792865722111,
+		"multiAssetsMargin": false,
+		"tradeGroupId": 0
+	}
+}

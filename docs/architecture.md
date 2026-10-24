@@ -161,7 +161,7 @@ interface Order {
   price: string | null;
   triggerPrice: string | null;
   reduceOnly: boolean;
-  timeInForce: 'gtc' | 'ioc' | 'fok' | 'post_only';
+  timeInForce: 'gtc' | 'ioc' | 'fok' | 'post_only' | 'gtd';  // gtd: futures Good-Till-Date
   positionSide: 'both' | 'long' | 'short';
   createdAt: number;
   updatedAt: number;
@@ -276,13 +276,19 @@ interface KindCapabilities {
   conditionalOrders: 'inline' | 'separate_api' | 'none';
 }
 
+// The members M1 has implemented so far; it widens to ExchangeAdapter once
+// subscribe (M1 issue 7), subscribePrices (8) and fetchFills (12) land.
+type BinanceAdapter = Pick<ExchangeAdapter,
+  'venue' | 'capabilities' | 'verifyCredential' | 'loadInstruments' | 'fetchSnapshot'>;
+
 declare function createBinanceAdapter(opts: {
+  accountId: string;              // stamped on every balance, position and order
   environment: Environment;
   credential: Credential;
-  fetch?: typeof fetch;           // injected in tests
-  WebSocket?: typeof WebSocket;   // injected in tests
+  fetch?: Fetch;                  // injected in tests; (url, init) => Promise<Response>
   now?: () => number;             // injected clock
-}): ExchangeAdapter;
+  // WebSocket? is added by M1 issue 7, the first member that opens a socket.
+}): BinanceAdapter;
 ```
 
 Binance values:
@@ -292,11 +298,14 @@ Binance values:
 | `spot` | `qty_down_or_cancel_replace` | `per_symbol` | `emulated` | `false` | 1 | `inline` |
 | `linear` | `limit_only` | `per_symbol` | `emulated` | `true` | 5 | `separate_api` |
 
-Binance `verifyCredential()` reads `GET /sapi/v1/account/apiRestrictions` and maps `enableReading`
-→ `canRead`, `enableSpotAndMarginTrading` → `canTradeSpot`, `enableFutures` → `canTradeDerivs`,
-`enableWithdrawals` → `canWithdraw`, `ipRestrict` → `ipRestricted`. The Demo docs list only `/api`
-hosts, so whether Demo serves this `/sapi` endpoint is unverified; M1 issue 6 settles the Demo path
-(`docs/venues/binance.md`, Unverified).
+Binance `verifyCredential()` on `live` reads `GET /sapi/v1/account/apiRestrictions` and maps
+`enableReading` → `canRead`, `enableSpotAndMarginTrading` → `canTradeSpot`, `enableFutures` →
+`canTradeDerivs`, `enableWithdrawals` → `canWithdraw`, `ipRestrict` → `ipRestricted`. Every field
+is optional in Binance's own types: a missing `enableWithdrawals` counts as `true`, so `keys add`
+refuses the key, and any other missing flag counts as `false`. Demo serves no `/sapi` (404), so
+on `demo` the report comes from `GET /api/v3/account` and `GET /fapi/v1/accountConfig`, with
+`canWithdraw: false`: their `canWithdraw` is an account flag, and Demo keys have no withdrawal
+permission (`docs/venues/binance.md`, Keys & permissions; `docs/decisions.md`, 2026-10-24).
 
 The terminal composes what a venue lacks from the capability flags — e.g. close-all as one
 reduce-only order per position, cancel-all as one call per symbol — instead of each adapter
@@ -501,9 +510,11 @@ has a static IP.
 
 - `packages/core`: a test for every exported function; known-value fixtures for rounding (tick,
   step, sigfig, side direction), uPnL and average cost.
-- Adapters: injected `fetch` replaying recordings from `packages/<venue>/__recordings__/` with
-  `X-MBX-APIKEY`, `signature`, `listenKey` and `apiKey` values scrubbed; streams against a local
-  fake WS server (`Bun.serve({ websocket })`) scripted per test.
+- Adapters: injected `fetch` replaying Demo recordings from `packages/<venue>/__recordings__/`:
+  no headers (so no `X-MBX-APIKEY`), no `signature` / `timestamp` / `recvWindow`, and
+  identifying values such as `apiKey`, `listenKey` and `uid` scrubbed (`docs/venues/binance.md`,
+  Recordings). Streams run against a local fake WS server (`Bun.serve({ websocket })`) scripted
+  per test.
 - Live smoke runs only against Binance Demo, manually. Development and CI never call live venue
   endpoints.
 - `test/workspace.test.ts` enforces the import graph of §2.

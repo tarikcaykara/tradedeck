@@ -1,0 +1,13 @@
+{
+	"request": {
+		"host": "futures",
+		"method": "GET",
+		"path": "/fapi/v1/positionSide/dual",
+		"params": {}
+	},
+	"status": 200,
+	"contentType": "application/json",
+	"body": {
+		"dualSidePosition": false
+	}
+}

@@ -1,0 +1,53 @@
+{
+	"request": {
+		"host": "spot",
+		"method": "GET",
+		"path": "/api/v3/account",
+		"params": {
+			"omitZeroBalances": "true"
+		}
+	},
+	"status": 200,
+	"contentType": "application/json;charset=UTF-8",
+	"body": {
+		"makerCommission": 10,
+		"takerCommission": 10,
+		"buyerCommission": 0,
+		"sellerCommission": 0,
+		"commissionRates": {
+			"maker": "0.00100000",
+			"taker": "0.00100000",
+			"buyer": "0.00000000",
+			"seller": "0.00000000"
+		},
+		"canTrade": true,
+		"canWithdraw": true,
+		"canDeposit": true,
+		"brokered": false,
+		"requireSelfTradePrevention": false,
+		"preventSor": false,
+		"updateTime": 1792865224407,
+		"accountType": "SPOT",
+		"balances": [
+			{
+				"asset": "BTC",
+				"free": "0.00011988",
+				"locked": "0.00000000"
+			},
+			{
+				"asset": "USDT",
+				"free": "4985.36734080",
+				"locked": "5.00000000"
+			},
+			{
+				"asset": "USDC",
+				"free": "5000.00000000",
+				"locked": "0.00000000"
+			}
+		],
+		"permissions": [
+			"SPOT"
+		],
+		"uid": 0
+	}
+}

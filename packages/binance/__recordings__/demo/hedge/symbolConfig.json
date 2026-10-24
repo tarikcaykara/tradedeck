@@ -1,0 +1,48 @@
+{
+	"request": {
+		"host": "futures",
+		"method": "GET",
+		"path": "/fapi/v1/symbolConfig",
+		"params": {}
+	},
+	"status": 200,
+	"contentType": "application/json",
+	"body": [
+		{
+			"symbol": "币安人生USDT",
+			"marginType": "CROSSED",
+			"isAutoAddMargin": false,
+			"leverage": 20,
+			"maxNotionalValue": "25000"
+		},
+		{
+			"symbol": "ETHUSDT",
+			"marginType": "ISOLATED",
+			"isAutoAddMargin": false,
+			"leverage": 3,
+			"maxNotionalValue": "100000000"
+		},
+		{
+			"symbol": "EOSUSDT",
+			"marginType": "CROSSED",
+			"isAutoAddMargin": false,
+			"leverage": 20,
+			"maxNotionalValue": "250000"
+		},
+		{
+			"symbol": "ARKUSDT",
+			"marginType": "CROSSED",
+			"isAutoAddMargin": false,
+			"leverage": 20,
+			"maxNotionalValue": "0"
+		},
+		{
+			"symbol": "BTCUSDT",
+			"marginType": "CROSSED",
+			"isAutoAddMargin": false,
+			"leverage": 7,
+			"maxNotionalValue": "40000000"
+		}
+	],
+	"note": "entries trimmed to 5 of 743"
+}

@@ -35,6 +35,27 @@ endpoint paths, weights and doc links only — tradedeck does not depend on it).
   https://developers.binance.com/en/docs/catalog/core-trading-wallet/api/rest-api/account#get-api-key-permission
   (fields from `[SDK]` `clients/wallet/src/rest-api/types/get-api-key-permission-response.ts`).
   `CredentialReport` mapping: `docs/architecture.md` §5.
+- **Demo has no `/sapi` (verified 2026-10-23):** `GET https://demo-api.binance.com/sapi/v1/account/apiRestrictions`
+  answers an nginx `404` HTML page, while `/api/v3/account` on the same host answers Binance JSON
+  errors. So the Demo credential check (M1 issue 6) reads `GET /api/v3/account` and
+  `GET /fapi/v1/accountConfig` instead:
+  - `canRead` = the signed reads succeeded;
+  - `canTradeSpot` = spot `canTrade`, `canTradeDerivs` = futures `canTrade`;
+  - `canWithdraw` = `false`: Demo's `canWithdraw` is an account flag, not a key permission
+    (`docs/decisions.md`, 2026-10-24);
+  - `ipRestricted` = `false` (not observable without `/sapi`).
+
+  Recorded 2026-10-24: spot `account` and futures `accountConfig` both answer `canTrade: true`
+  and `canWithdraw: true` for a Demo key with Reading, Spot & Margin and Futures enabled. The
+  Demo key form offers only those three permissions, never withdrawals, so `canWithdraw` cannot
+  describe the key. `[INFERENCE]` `canTrade` is account-level too; not verified, because the
+  recorded key had trading enabled.
+- **Demo accepts self-generated Ed25519 keys (verified 2026-10-24):** demo.binance.com → API
+  Management → Self-generated takes the three-line SPKI PEM (`-----BEGIN PUBLIC KEY-----` …
+  `-----END PUBLIC KEY-----`) exactly as `bun run record:binance` prints it, and every signed spot
+  and futures read then answers `200`. An earlier attempt answered `400 -1022` ("Signature for this
+  request is not valid.") on every signed read; the adapter's signatures verify against the
+  process's own public key, so `[INFERENCE]` that key was registered from another keypair.
 - **Key expiry:** unverified — see Unverified.
 
 ## Signing
@@ -141,6 +162,25 @@ Futures v3 `account`/`balance`/`positionRisk` return only symbols with a positio
 the config fields moved to `symbolConfig`/`accountConfig`. The v2 versions were announced
 deprecated on 2024-07-24 with no date `[FC]`.
 
+## Account snapshot
+
+`fetchSnapshot()` (M1 issue 6) makes seven calls in parallel: spot `account?omitZeroBalances=true`
+and `openOrders`, futures v3 `balance` and `positionRisk`, `symbolConfig`, `openOrders` and
+`openAlgoOrders`. Any failing call fails the snapshot. `GET /fapi/v3/account` and
+`positionSide/dual` are recorded for information only: no `AccountSnapshot` field needs them.
+
+- **Spot balances:** `free`, `locked`, `total = free + locked`.
+- **Futures balances (v3 `balance`):** `total = balance` (wallet balance, unrealized PnL excluded),
+  `free = maxWithdrawAmount`, `locked = max(0, total − free)`. A row whose `balance` and
+  `maxWithdrawAmount` are both zero is dropped.
+- **Positions:** v3 `positionRisk` joined with `symbolConfig` on the symbol for `leverage` and
+  `marginType` (`CROSSED` → `cross`, `ISOLATED` → `isolated`); a position without a
+  `symbolConfig` row is a `decode` error. Rows with `positionAmt` 0 are dropped. `side` comes from
+  `positionSide` in hedge mode and from the sign of `positionAmt` in one-way mode; `size` is the
+  absolute value. `liquidationPrice` ≤ 0 → `null` (the recorded one-way cross long answers `"0"`).
+- **Orders:** spot `openOrders`, futures `openOrders` and `openAlgoOrders`, mapped per Order rules
+  below.
+
 ## Private streams
 
 **Spot** — WS API `userDataStream.subscribe.signature` on the spot WS API host (`live`
@@ -204,17 +244,29 @@ deprecated on 2024-07-24 with no date `[FC]`.
   `reduceOnly=true`, or hedge `LONG`+`SELL` / `SHORT`+`BUY` are exempt from the `-1008` overload
   throttle.
   https://developers.binance.com/en/docs/products/derivatives-trading-usds-futures/general-info
-- **Domain type mapping** `[INFERENCE]` (confirmed against recordings in M1 issue 6):
+- **Domain type mapping.** Rows marked "recorded" were seen in the Demo recordings of 2026-10-24;
+  the rest come from the docs, `[INFERENCE]`:
 
   | Domain `Order.type` | Spot | USDⓈ-M |
   |---|---|---|
   | `market` | `MARKET` | `MARKET` |
-  | `limit` | `LIMIT`; `LIMIT_MAKER` → `limit` + `post_only` | `LIMIT` |
-  | `stop_market` | `STOP_LOSS` | `STOP_MARKET` (algo) |
+  | `limit` | `LIMIT` (recorded); `LIMIT_MAKER` → `limit` + `post_only` | `LIMIT` |
+  | `stop_market` | `STOP_LOSS` | `STOP_MARKET` (algo; recorded in `openOrders`) |
   | `stop_limit` | `STOP_LOSS_LIMIT` | `STOP` (algo) |
-  | `take_profit_market` | `TAKE_PROFIT` | `TAKE_PROFIT_MARKET` (algo) |
+  | `take_profit_market` | `TAKE_PROFIT` | `TAKE_PROFIT_MARKET` (recorded in both) |
   | `take_profit_limit` | `TAKE_PROFIT_LIMIT` | `TAKE_PROFIT` (algo) |
   | `trailing_stop_market` | — (`trailingDelta` on stop types) | `TRAILING_STOP_MARKET` (algo) |
+- **Where futures TP/SL appear (recorded on Demo 2026-10-24):** a TP/SL attached to an entry order
+  in the web UI (`strategyType: "OTOCO"`) is listed by `GET /fapi/v1/openOrders` as
+  `TAKE_PROFIT_MARKET` / `STOP_MARKET` with `reduceOnly: true`. A TP added to an open position is
+  an algo order in `GET /fapi/v1/openAlgoOrders` (`algoType: "CONDITIONAL"`). The snapshot reads
+  both.
+- **Time in force:** `GTC` / `IOC` / `FOK` → `gtc` / `ioc` / `fok`; `GTX` and `RPI` →
+  `post_only`; `GTD` → `gtd`; `GTE_GTC` → `gtc`. `GTE_GTC` is not in the documented futures enum,
+  yet every recorded TP/SL carries it, in `openOrders` and `openAlgoOrders` alike. The order rests
+  like GTC and expires when its position closes
+  (https://github.com/ViewBlock/binance-api-node/pull/573); `[INFERENCE]` the expiry then arrives
+  as status `EXPIRED`, which maps to `expired`.
 
 ## Filters
 
@@ -229,10 +281,24 @@ deprecated on 2024-07-24 with no date `[FC]`.
   `PRICE_FILTER`, `LOT_SIZE`, `MARKET_LOT_SIZE`; `MIN_NOTIONAL` has a single `notional` field and
   uses mark price for market orders; `PERCENT_PRICE` is relative to mark price; `MAX_NUM_ORDERS`.
   The futures lot-size rule is `(qty − minQty) % stepSize`, the spot rule `qty % stepSize`.
-- **Mapping to `Instrument`:** `priceRule = { kind: 'tick', tick: PRICE_FILTER.tickSize }`;
-  `qtyRule.step = LOT_SIZE.stepSize`, `qtyRule.marketStep = MARKET_LOT_SIZE.stepSize`,
-  `qtyRule.minQty = LOT_SIZE.minQty`; `minNotional` = spot `NOTIONAL.minNotional` (or
-  `MIN_NOTIONAL`), futures `MIN_NOTIONAL.notional`.
+- **Mapping to `Instrument`** (implemented in M1 issue 6):
+  - `priceRule = { kind: 'tick', tick: PRICE_FILTER.tickSize }`; `qtyRule.step = LOT_SIZE.stepSize`,
+    `qtyRule.minQty = LOT_SIZE.minQty`; `minNotional` = spot `NOTIONAL.minNotional` (or the legacy
+    `MIN_NOTIONAL.minNotional`), futures `MIN_NOTIONAL.notional`; futures `settle = marginAsset`.
+  - `qtyRule.marketStep = MARKET_LOT_SIZE.stepSize` when present and non-zero, else
+    `LOT_SIZE.stepSize`. Demo spot `exchangeInfo` on 2026-10-23: 3662 of 3736 symbols report
+    `MARKET_LOT_SIZE.stepSize = "0.00000000"` and 74 omit the filter; no non-zero value differs
+    from `LOT_SIZE`. Every futures symbol has a non-zero value; one differed (`ARKUSDT`: lot 3,
+    market 1).
+  - Only `TRADING` symbols: spot asks with `symbolStatus=TRADING` (5.95 MB / 1383 symbols instead
+    of 17.8 MB / 3736, most of the rest `BREAK`); futures has no such parameter and is filtered
+    client-side (604 of 742 on Demo). A symbol with a zero or missing tick or step, or a missing
+    minimum quantity or minimum notional, is dropped (seen once: a `PENDING_TRADING` futures symbol
+    with tick `0`). A zero minimum means no minimum, and the symbol is kept.
+    Positions and orders on a dropped symbol still map — they need only its `InstrumentId`.
+  - Futures `maxLeverage` = bracket 1 `initialLeverage` from `GET /fapi/v1/leverageBracket`
+    (signed; all bracket values are JSON numbers).
+  - Symbols are not ASCII-only: both markets list e.g. `币安人生USDT`.
 
 ## Rate limits & idempotency
 
@@ -252,6 +318,41 @@ deprecated on 2024-07-24 with no date `[FC]`.
   `-1007`, futures 503 "Unknown error") **never retry blindly** — query by `clientOrderId` or wait
   for the user-data event. https://developers.binance.com/en/docs/products/spot/rest-api,
   https://developers.binance.com/en/docs/products/derivatives-trading-usds-futures/general-info
+
+## Recordings
+
+Adapter tests replay Binance Demo responses from `packages/binance/__recordings__/demo/<scenario>/`.
+
+- **Recorder:** `bun run record:binance` (`apps/cli/src/record/`), owner-run, Demo only.
+  - Ed25519 (default): it generates the keypair in memory and prints the public-key PEM unframed,
+    ready to paste into Demo "Self-generated". HMAC is the alternative.
+  - The API key (and HMAC secret) come from hidden prompts; nothing is written but the recordings.
+  - It sends exactly the adapter's endpoint table (`packages/binance/src/endpoints.ts`): scenario
+    `oneway`, then optionally `hedge` after the owner switches Demo futures to Hedge Mode.
+- **File format:** one `<endpoint>.json` per request:
+  `{ request: { host, method, path, params }, status, contentType, body, note? }`. Non-2xx
+  answers are kept, e.g. the `/sapi` 404 page as text.
+- **Scrubbing:** `signature`, `timestamp` and `recvWindow` are dropped from the params, and no
+  header is stored. Values under `apiKey`, `listenKey`, `uid`, `accountAlias` and `tradeGroupId`
+  become placeholders of the same JSON type at any depth. `packages/binance/test/recording.test.ts`
+  guards every committed file.
+- **Trimming:** `exchangeInfo`, `leverageBracket` and `symbolConfig` keep a fixed set
+  (`BTCUSDT`, `ETHUSDT`, `ETHBTC` on spot, `币安人生USDT`) plus:
+  - every symbol held or with an order;
+  - the first spot symbol without `MARKET_LOT_SIZE` (none among the 1383 spot `TRADING` symbols
+    on 2026-10-24);
+  - the first non-`TRADING` futures symbol;
+  - the first futures symbol whose market step differs from its lot step.
+
+  `note` records the trim.
+- **Replay:** `packages/binance/test/support/replay.ts` answers by host, method, path and the
+  non-auth params; anything unrecorded is a 404 listed in `misses`.
+- **Current set (2026-10-24):**
+  - `oneway`: a spot `LIMIT` buy; BTCUSDT cross 7× long with an entry TP/SL; ETHUSDT isolated 3×
+    short.
+  - `hedge`: BTCUSDT `LONG` and `SHORT` 0.0018, with an algo TP on the `LONG`.
+
+  Biome skips `__recordings__` (generated venue data).
 
 ## Watch list
 
@@ -285,10 +386,6 @@ Carried from research; each item names where it gets settled.
   90 days; the 2021 validity-period announcement was marked no longer applicable on 2023-10-24
   (https://www.binance.com/en/support/announcement/detail/11e4c2f44e7a47b9b5fc0e479c0b256f).
   `doctor` (M1 issue 13) surfaces a failing credential either way.
-- **Demo + `/sapi`:** the Demo docs list only `/api` hosts; whether
-  `/sapi/v1/account/apiRestrictions` works on Demo is unknown — M1 issue 6.
-- **Demo + self-generated Ed25519 keys:** unknown; if refused, M1 issue 9 keeps `--kind hmac` for
-  Demo accounts and this file records it.
 - **Demo futures stream paths:** whether `demo-fstream` uses the same `/private/ws/<listenKey>`
   path and `/market` / `/public` split as live — M1 issues 7 and 8.
 - **Futures mark-price stream path** under `/market` — M1 issue 8.
@@ -297,7 +394,7 @@ Carried from research; each item names where it gets settled.
 - **Spot `REQUEST_WEIGHT` per minute:** read from `/api/v3/exchangeInfo` at runtime.
 - **`enableInternalTransfer` / `permitsUniversalTransfer`:** whether either lets funds leave the
   owner's accounts; M1 issue 9 decides whether they are refused like withdrawals.
-- **`MARKET_LOT_SIZE.stepSize` of `0`:** whether it occurs, and if so whether `marketStep` falls
-  back to `LOT_SIZE.stepSize` — M1 issue 6.
 - **Commission endpoint response fields** (spot and futures) — M2.
+- **`symbolStatus=TRADING` on live spot `exchangeInfo`:** documented and verified on Demo only;
+  live is never called from development.
 - **Removal date** of the deprecated spot REST listenKey endpoints — none announced.

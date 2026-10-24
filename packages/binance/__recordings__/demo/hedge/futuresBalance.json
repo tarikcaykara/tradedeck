@@ -1,0 +1,100 @@
+{
+	"request": {
+		"host": "futures",
+		"method": "GET",
+		"path": "/fapi/v3/balance",
+		"params": {}
+	},
+	"status": 200,
+	"contentType": "application/json",
+	"body": [
+		{
+			"accountAlias": "SCRUBBED",
+			"asset": "FDUSD",
+			"balance": "0.00000000",
+			"crossWalletBalance": "0.00000000",
+			"crossUnPnl": "0.00000000",
+			"availableBalance": "0.00000000",
+			"maxWithdrawAmount": "0.00000000",
+			"marginAvailable": true,
+			"updateTime": 0
+		},
+		{
+			"accountAlias": "SCRUBBED",
+			"asset": "U",
+			"balance": "0.00000000",
+			"crossWalletBalance": "0.00000000",
+			"crossUnPnl": "0.00000000",
+			"availableBalance": "0.00000000",
+			"maxWithdrawAmount": "0.00000000",
+			"marginAvailable": true,
+			"updateTime": 0
+		},
+		{
+			"accountAlias": "SCRUBBED",
+			"asset": "BNB",
+			"balance": "0.00000000",
+			"crossWalletBalance": "0.00000000",
+			"crossUnPnl": "0.00000000",
+			"availableBalance": "0.00000000",
+			"maxWithdrawAmount": "0.00000000",
+			"marginAvailable": true,
+			"updateTime": 0
+		},
+		{
+			"accountAlias": "SCRUBBED",
+			"asset": "ETH",
+			"balance": "0.00000000",
+			"crossWalletBalance": "0.00000000",
+			"crossUnPnl": "0.00000000",
+			"availableBalance": "0.00000000",
+			"maxWithdrawAmount": "0.00000000",
+			"marginAvailable": true,
+			"updateTime": 0
+		},
+		{
+			"accountAlias": "SCRUBBED",
+			"asset": "BTC",
+			"balance": "0.01000000",
+			"crossWalletBalance": "0.01000000",
+			"crossUnPnl": "0.00000000",
+			"availableBalance": "0.01000000",
+			"maxWithdrawAmount": "0.01000000",
+			"marginAvailable": true,
+			"updateTime": 1792865236401
+		},
+		{
+			"accountAlias": "SCRUBBED",
+			"asset": "USDT",
+			"balance": "4998.26245962",
+			"crossWalletBalance": "4998.26245962",
+			"crossUnPnl": "-0.04824000",
+			"availableBalance": "4956.88967126",
+			"maxWithdrawAmount": "4956.88967126",
+			"marginAvailable": true,
+			"updateTime": 1792866979996
+		},
+		{
+			"accountAlias": "SCRUBBED",
+			"asset": "USD1",
+			"balance": "0.00000000",
+			"crossWalletBalance": "0.00000000",
+			"crossUnPnl": "0.00000000",
+			"availableBalance": "0.00000000",
+			"maxWithdrawAmount": "0.00000000",
+			"marginAvailable": true,
+			"updateTime": 0
+		},
+		{
+			"accountAlias": "SCRUBBED",
+			"asset": "USDC",
+			"balance": "5000.00000000",
+			"crossWalletBalance": "5000.00000000",
+			"crossUnPnl": "0.00000000",
+			"availableBalance": "5000.00000000",
+			"maxWithdrawAmount": "5000.00000000",
+			"marginAvailable": true,
+			"updateTime": 1792865236276
+		}
+	]
+}

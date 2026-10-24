@@ -6,7 +6,14 @@
 		"useIgnoreFile": true
 	},
 	"files": {
-		"includes": ["**", "!**/node_modules", "!**/dist", "!**/*.md", "!bun.lock"]
+		"includes": [
+			"**",
+			"!**/node_modules",
+			"!**/dist",
+			"!**/__recordings__",
+			"!**/*.md",
+			"!bun.lock"
+		]
 	},
 	"formatter": {
 		"enabled": true,
