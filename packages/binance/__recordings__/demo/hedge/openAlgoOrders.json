@@ -1,0 +1,40 @@
+{
+	"request": {
+		"host": "futures",
+		"method": "GET",
+		"path": "/fapi/v1/openAlgoOrders",
+		"params": {}
+	},
+	"status": 200,
+	"contentType": "application/json",
+	"body": [
+		{
+			"algoId": 1000000255801971,
+			"clientAlgoId": "web_algo_coin_mekyocnm22w8vp1nwm",
+			"algoType": "CONDITIONAL",
+			"orderType": "TAKE_PROFIT_MARKET",
+			"symbol": "BTCUSDT",
+			"side": "SELL",
+			"positionSide": "LONG",
+			"timeInForce": "GTE_GTC",
+			"quantity": "0.0018",
+			"algoStatus": "NEW",
+			"actualOrderId": "",
+			"actualQty": "0.0",
+			"triggerPrice": "80400.0",
+			"price": "0.0",
+			"icebergQuantity": null,
+			"selfTradePreventionMode": "NONE",
+			"workingType": "CONTRACT_PRICE",
+			"priceMatch": "NONE",
+			"closePosition": false,
+			"priceProtect": false,
+			"reduceOnly": true,
+			"createTime": 1792867035782,
+			"updateTime": 1792867035783,
+			"triggerTime": 0,
+			"goodTillDate": 0,
+			"isActivated": false
+		}
+	]
+}

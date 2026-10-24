@@ -1,0 +1,13 @@
+{
+	"request": {
+		"host": "spot",
+		"method": "GET",
+		"path": "/api/v3/time",
+		"params": {}
+	},
+	"status": 200,
+	"contentType": "application/json;charset=UTF-8",
+	"body": {
+		"serverTime": 1792866552460
+	}
+}

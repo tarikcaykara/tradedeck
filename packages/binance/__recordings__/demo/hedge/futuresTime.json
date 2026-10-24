@@ -1,0 +1,13 @@
+{
+	"request": {
+		"host": "futures",
+		"method": "GET",
+		"path": "/fapi/v1/time",
+		"params": {}
+	},
+	"status": 200,
+	"contentType": "application/json",
+	"body": {
+		"serverTime": 1792867138130
+	}
+}

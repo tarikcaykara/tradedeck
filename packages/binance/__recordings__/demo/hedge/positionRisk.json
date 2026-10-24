@@ -1,0 +1,56 @@
+{
+	"request": {
+		"host": "futures",
+		"method": "GET",
+		"path": "/fapi/v3/positionRisk",
+		"params": {}
+	},
+	"status": 200,
+	"contentType": "application/json",
+	"body": [
+		{
+			"symbol": "BTCUSDT",
+			"positionSide": "LONG",
+			"positionAmt": "0.0018",
+			"entryPrice": "80349.90000000001",
+			"breakEvenPrice": "80382.03996000001",
+			"markPrice": "80291.69653986",
+			"unRealizedProfit": "-0.10476622",
+			"liquidationPrice": "249929135.69920683",
+			"isolatedMargin": "0",
+			"notional": "144.52505377",
+			"marginAsset": "USDT",
+			"isolatedWallet": "0",
+			"initialMargin": "20.64643729",
+			"maintMargin": "0.57810021",
+			"positionInitialMargin": "20.64643729",
+			"openOrderInitialMargin": "0",
+			"adl": 0,
+			"bidNotional": "0",
+			"askNotional": "0",
+			"updateTime": 1792866928130
+		},
+		{
+			"symbol": "BTCUSDT",
+			"positionSide": "SHORT",
+			"positionAmt": "-0.0018",
+			"entryPrice": "80323.1",
+			"breakEvenPrice": "80290.97076000001",
+			"markPrice": "80291.69653986",
+			"unRealizedProfit": "0.05652622",
+			"liquidationPrice": "249929135.69920683",
+			"isolatedMargin": "0",
+			"notional": "-144.52505377",
+			"marginAsset": "USDT",
+			"isolatedWallet": "0",
+			"initialMargin": "20.64643729",
+			"maintMargin": "0.57810021",
+			"positionInitialMargin": "20.64643729",
+			"openOrderInitialMargin": "0",
+			"adl": 0,
+			"bidNotional": "0",
+			"askNotional": "0",
+			"updateTime": 1792866979996
+		}
+	]
+}
