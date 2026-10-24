@@ -44,9 +44,11 @@ async function readCredential(): Promise<Credential> {
 	);
 	if (kind === "ed25519") {
 		const { publicKey, privateKey } = generateKeyPairSync("ed25519");
-		note(
-			publicKey.export({ type: "spki", format: "pem" }).toString(),
-			"Paste into demo.binance.com → API Management → Self-generated; enable Reading only",
+		log.step(
+			"Paste this public key into demo.binance.com → API Management → Self-generated; enable Reading only:",
+		);
+		process.stdout.write(
+			`\n${publicKey.export({ type: "spki", format: "pem" }).toString()}\n`,
 		);
 		const apiKey = answer(await password({ message: "Demo API key" }));
 		return {
