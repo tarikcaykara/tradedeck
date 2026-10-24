@@ -510,9 +510,11 @@ has a static IP.
 
 - `packages/core`: a test for every exported function; known-value fixtures for rounding (tick,
   step, sigfig, side direction), uPnL and average cost.
-- Adapters: injected `fetch` replaying recordings from `packages/<venue>/__recordings__/` with
-  `X-MBX-APIKEY`, `signature`, `listenKey` and `apiKey` values scrubbed; streams against a local
-  fake WS server (`Bun.serve({ websocket })`) scripted per test.
+- Adapters: injected `fetch` replaying Demo recordings from `packages/<venue>/__recordings__/`:
+  no headers (so no `X-MBX-APIKEY`), no `signature` / `timestamp` / `recvWindow`, and
+  identifying values such as `apiKey`, `listenKey` and `uid` scrubbed (`docs/venues/binance.md`,
+  Recordings). Streams run against a local fake WS server (`Bun.serve({ websocket })`) scripted
+  per test.
 - Live smoke runs only against Binance Demo, manually. Development and CI never call live venue
   endpoints.
 - `test/workspace.test.ts` enforces the import graph of §2.

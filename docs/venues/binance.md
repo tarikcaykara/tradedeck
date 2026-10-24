@@ -162,6 +162,25 @@ Futures v3 `account`/`balance`/`positionRisk` return only symbols with a positio
 the config fields moved to `symbolConfig`/`accountConfig`. The v2 versions were announced
 deprecated on 2024-07-24 with no date `[FC]`.
 
+## Account snapshot
+
+`fetchSnapshot()` (M1 issue 6) makes seven calls in parallel: spot `account?omitZeroBalances=true`
+and `openOrders`, futures v3 `balance` and `positionRisk`, `symbolConfig`, `openOrders` and
+`openAlgoOrders`. Any failing call fails the snapshot. `GET /fapi/v3/account` and
+`positionSide/dual` are recorded for information only: no `AccountSnapshot` field needs them.
+
+- **Spot balances:** `free`, `locked`, `total = free + locked`.
+- **Futures balances (v3 `balance`):** `total = balance` (wallet balance, unrealized PnL excluded),
+  `free = maxWithdrawAmount`, `locked = max(0, total − free)`. A row whose `balance` and
+  `maxWithdrawAmount` are both zero is dropped.
+- **Positions:** v3 `positionRisk` joined with `symbolConfig` on the symbol for `leverage` and
+  `marginType` (`CROSSED` → `cross`, `ISOLATED` → `isolated`); a position without a
+  `symbolConfig` row is a `decode` error. Rows with `positionAmt` 0 are dropped. `side` comes from
+  `positionSide` in hedge mode and from the sign of `positionAmt` in one-way mode; `size` is the
+  absolute value. `liquidationPrice` ≤ 0 → `null` (the recorded one-way cross long answers `"0"`).
+- **Orders:** spot `openOrders`, futures `openOrders` and `openAlgoOrders`, mapped per Order rules
+  below.
+
 ## Private streams
 
 **Spot** — WS API `userDataStream.subscribe.signature` on the spot WS API host (`live`
@@ -298,6 +317,41 @@ deprecated on 2024-07-24 with no date `[FC]`.
   `-1007`, futures 503 "Unknown error") **never retry blindly** — query by `clientOrderId` or wait
   for the user-data event. https://developers.binance.com/en/docs/products/spot/rest-api,
   https://developers.binance.com/en/docs/products/derivatives-trading-usds-futures/general-info
+
+## Recordings
+
+Adapter tests replay Binance Demo responses from `packages/binance/__recordings__/demo/<scenario>/`.
+
+- **Recorder:** `bun run record:binance` (`apps/cli/src/record/`), owner-run, Demo only.
+  - Ed25519 (default): it generates the keypair in memory and prints the public-key PEM unframed,
+    ready to paste into Demo "Self-generated". HMAC is the alternative.
+  - The API key (and HMAC secret) come from hidden prompts; nothing is written but the recordings.
+  - It sends exactly the adapter's endpoint table (`packages/binance/src/endpoints.ts`): scenario
+    `oneway`, then optionally `hedge` after the owner switches Demo futures to Hedge Mode.
+- **File format:** one `<endpoint>.json` per request:
+  `{ request: { host, method, path, params }, status, contentType, body, note? }`. Non-2xx
+  answers are kept, e.g. the `/sapi` 404 page as text.
+- **Scrubbing:** `signature`, `timestamp` and `recvWindow` are dropped from the params, and no
+  header is stored. Values under `apiKey`, `listenKey`, `uid`, `accountAlias` and `tradeGroupId`
+  become placeholders of the same JSON type at any depth. `packages/binance/test/recording.test.ts`
+  guards every committed file.
+- **Trimming:** `exchangeInfo`, `leverageBracket` and `symbolConfig` keep a fixed set
+  (`BTCUSDT`, `ETHUSDT`, `ETHBTC` on spot, `币安人生USDT`) plus:
+  - every symbol held or with an order;
+  - the first spot symbol without `MARKET_LOT_SIZE` (none among the 1383 spot `TRADING` symbols
+    on 2026-10-24);
+  - the first non-`TRADING` futures symbol;
+  - the first futures symbol whose market step differs from its lot step.
+
+  `note` records the trim.
+- **Replay:** `packages/binance/test/support/replay.ts` answers by host, method, path and the
+  non-auth params; anything unrecorded is a 404 listed in `misses`.
+- **Current set (2026-10-24):**
+  - `oneway`: a spot `LIMIT` buy; BTCUSDT cross 7× long with an entry TP/SL; ETHUSDT isolated 3×
+    short.
+  - `hedge`: BTCUSDT `LONG` and `SHORT` 0.0018, with an algo TP on the `LONG`.
+
+  Biome skips `__recordings__` (generated venue data).
 
 ## Watch list
 
