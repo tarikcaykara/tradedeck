@@ -12,10 +12,7 @@ const ApiRestrictions = z.object({
 	enableFutures: z.boolean().optional(),
 });
 
-const AccountFlags = z.object({
-	canTrade: z.boolean(),
-	canWithdraw: z.boolean(),
-});
+const AccountFlags = z.object({ canTrade: z.boolean() });
 
 /**
  * Live: the key's own permissions (`/sapi/v1/account/apiRestrictions`,
@@ -24,7 +21,10 @@ const AccountFlags = z.object({
  *
  * Demo serves no `/sapi` (404), so its report comes from the spot account and
  * the futures account configuration: a successful signed read proves
- * `canRead`, and an IP restriction cannot be observed there.
+ * `canRead`, and an IP restriction cannot be observed there. Their
+ * `canWithdraw` is an account flag (Demo answers `true`), not a key
+ * permission: Demo keys offer no withdrawal permission and Demo funds are not
+ * real, so Demo reports `canWithdraw: false` (docs/decisions.md).
  */
 export async function verifyCredential(
 	http: BinanceHttp,
@@ -48,7 +48,7 @@ export async function verifyCredential(
 		canRead: true,
 		canTradeSpot: spot.canTrade,
 		canTradeDerivs: futures.canTrade,
-		canWithdraw: spot.canWithdraw || futures.canWithdraw,
+		canWithdraw: false,
 		ipRestricted: false,
 	};
 }

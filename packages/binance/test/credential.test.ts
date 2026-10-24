@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { VenueError } from "@tradedeck/adapter";
 import { createBinanceAdapter } from "../src/adapter.ts";
+import { loadScenario, replay, type Scenario } from "./support/replay.ts";
 
 const credential = { kind: "hmac", apiKey: "k", secret: "s" } as const;
 
@@ -87,5 +89,76 @@ describe("verifyCredential — live", () => {
 			canWithdraw: false,
 			ipRestricted: false,
 		});
+	});
+});
+
+function demo(scenario: Scenario) {
+	const r = replay(scenario);
+	const adapter = createBinanceAdapter({
+		accountId: "acc-1",
+		environment: "demo",
+		credential,
+		fetch: r.fetch,
+	});
+	return { adapter, ...r };
+}
+
+interface AccountFlags {
+	canTrade: boolean;
+	canWithdraw: boolean;
+}
+
+/** The recorded account flags of one endpoint, mutable in a cloned scenario. */
+function flags(
+	scenario: Scenario,
+	name: "spotAccount" | "accountConfig",
+): AccountFlags {
+	const recording = scenario[name];
+	if (recording === undefined) throw new Error(`no ${name} recording`);
+	return recording.body as AccountFlags;
+}
+
+describe("verifyCredential — Demo (recorded)", () => {
+	test("reads the spot account and futures config, never /sapi, and reports no withdrawal", async () => {
+		const scenario = await loadScenario("oneway");
+		// Demo's account-level flag, not a key permission (docs/decisions.md).
+		expect(flags(scenario, "spotAccount").canWithdraw).toBe(true);
+		expect(flags(scenario, "accountConfig").canWithdraw).toBe(true);
+		const { adapter, requested, misses } = demo(scenario);
+		expect(await adapter.verifyCredential()).toEqual({
+			canRead: true,
+			canTradeSpot: true,
+			canTradeDerivs: true,
+			canWithdraw: false,
+			ipRestricted: false,
+		});
+		expect(requested.filter((r) => r.includes("/sapi/"))).toEqual([]);
+		expect(misses).toEqual([]);
+	});
+
+	test("trade flags come from the spot account and the futures config respectively", async () => {
+		const scenario = structuredClone(await loadScenario("oneway"));
+		flags(scenario, "spotAccount").canTrade = false;
+		const { adapter } = demo(scenario);
+		expect(await adapter.verifyCredential()).toMatchObject({
+			canTradeSpot: false,
+			canTradeDerivs: true,
+		});
+	});
+
+	test("a rejected signed read is not reported as readable", async () => {
+		const scenario = structuredClone(await loadScenario("oneway"));
+		const accountConfig = scenario.accountConfig;
+		if (accountConfig === undefined) throw new Error("no accountConfig");
+		scenario.accountConfig = {
+			...accountConfig,
+			status: 401,
+			body: {
+				code: -2015,
+				msg: "Invalid API-key, IP, or permissions for action.",
+			},
+		};
+		const { adapter } = demo(scenario);
+		await expect(adapter.verifyCredential()).rejects.toBeInstanceOf(VenueError);
 	});
 });

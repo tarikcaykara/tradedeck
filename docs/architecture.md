@@ -303,8 +303,9 @@ Binance `verifyCredential()` on `live` reads `GET /sapi/v1/account/apiRestrictio
 `canTradeDerivs`, `enableWithdrawals` → `canWithdraw`, `ipRestrict` → `ipRestricted`. Every field
 is optional in Binance's own types: a missing `enableWithdrawals` counts as `true`, so `keys add`
 refuses the key, and any other missing flag counts as `false`. Demo serves no `/sapi` (404), so
-on `demo` the report comes from `GET /api/v3/account` and `GET /fapi/v1/accountConfig`
-(`docs/venues/binance.md`, Credential check).
+on `demo` the report comes from `GET /api/v3/account` and `GET /fapi/v1/accountConfig`, with
+`canWithdraw: false`: their `canWithdraw` is an account flag, and Demo keys have no withdrawal
+permission (`docs/venues/binance.md`, Keys & permissions; `docs/decisions.md`, 2026-10-24).
 
 The terminal composes what a venue lacks from the capability flags — e.g. close-all as one
 reduce-only order per position, cancel-all as one call per symbol — instead of each adapter

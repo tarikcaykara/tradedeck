@@ -41,10 +41,15 @@ endpoint paths, weights and doc links only — tradedeck does not depend on it).
   `GET /fapi/v1/accountConfig` instead:
   - `canRead` = the signed reads succeeded;
   - `canTradeSpot` = spot `canTrade`, `canTradeDerivs` = futures `canTrade`;
-  - `canWithdraw` = spot `canWithdraw` OR futures `canWithdraw`;
+  - `canWithdraw` = `false`: Demo's `canWithdraw` is an account flag, not a key permission
+    (`docs/decisions.md`, 2026-10-24);
   - `ipRestricted` = `false` (not observable without `/sapi`).
 
-  `[INFERENCE]` these flags may describe the account rather than the key.
+  Recorded 2026-10-24: spot `account` and futures `accountConfig` both answer `canTrade: true`
+  and `canWithdraw: true` for a Demo key with Reading, Spot & Margin and Futures enabled. The
+  Demo key form offers only those three permissions, never withdrawals, so `canWithdraw` cannot
+  describe the key. `[INFERENCE]` `canTrade` is account-level too; not verified, because the
+  recorded key had trading enabled.
 - **Demo accepts self-generated Ed25519 keys (verified 2026-10-24):** demo.binance.com → API
   Management → Self-generated takes the three-line SPKI PEM (`-----BEGIN PUBLIC KEY-----` …
   `-----END PUBLIC KEY-----`) exactly as `bun run record:binance` prints it, and every signed spot

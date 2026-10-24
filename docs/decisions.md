@@ -219,3 +219,20 @@ user. Tests replay recorded responses (hard rule 9), and the repo is public.
 - The live credential check (`/sapi`) has no recording: Demo does not serve `/sapi`, and live is
   never called. Its test uses Binance's documented response shape.
 - Re-recording after a Binance change is one owner-run command.
+
+## 2026-10-24 — Binance Demo keys report no withdrawal permission
+
+**Context:** Hard rule 2 refuses a credential whose venue reports withdrawal permission. On live,
+Binance reports the key's own permissions through `/sapi/v1/account/apiRestrictions`. Demo serves
+no `/sapi`, so the Demo check reads the spot `account` and futures `accountConfig`. The Demo
+recording (2026-10-24) shows `canWithdraw: true` in both. The Demo key form offers only Reading,
+Spot & Margin and Futures, never withdrawals, so the flag describes the account, not the key.
+Mapping it through would refuse every Demo key at `keys add`.
+
+**Decision:** On `demo`, Binance `verifyCredential()` reports `canWithdraw: false`. The live
+mapping is unchanged: a live key reporting `enableWithdrawals`, or missing it, is still refused.
+
+**Consequences:**
+- Demo keys can be added; Demo funds are not real, and a Demo key cannot withdraw.
+- If Binance ever adds a withdrawal permission to Demo keys, or serves `/sapi` on Demo, this
+  decision is revisited and Demo reads the key's own permissions.
