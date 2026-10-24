@@ -45,6 +45,12 @@ endpoint paths, weights and doc links only — tradedeck does not depend on it).
   - `ipRestricted` = `false` (not observable without `/sapi`).
 
   `[INFERENCE]` these flags may describe the account rather than the key.
+- **Demo accepts self-generated Ed25519 keys (verified 2026-10-24):** demo.binance.com → API
+  Management → Self-generated takes the three-line SPKI PEM (`-----BEGIN PUBLIC KEY-----` …
+  `-----END PUBLIC KEY-----`) exactly as `bun run record:binance` prints it, and every signed spot
+  and futures read then answers `200`. An earlier attempt answered `400 -1022` ("Signature for this
+  request is not valid.") on every signed read; the adapter's signatures verify against the
+  process's own public key, so `[INFERENCE]` that key was registered from another keypair.
 - **Key expiry:** unverified — see Unverified.
 
 ## Signing
@@ -308,8 +314,6 @@ Carried from research; each item names where it gets settled.
   90 days; the 2021 validity-period announcement was marked no longer applicable on 2023-10-24
   (https://www.binance.com/en/support/announcement/detail/11e4c2f44e7a47b9b5fc0e479c0b256f).
   `doctor` (M1 issue 13) surfaces a failing credential either way.
-- **Demo + self-generated Ed25519 keys:** unknown; if refused, M1 issue 9 keeps `--kind hmac` for
-  Demo accounts and this file records it.
 - **Demo futures stream paths:** whether `demo-fstream` uses the same `/private/ws/<listenKey>`
   path and `/market` / `/public` split as live — M1 issues 7 and 8.
 - **Futures mark-price stream path** under `/market` — M1 issue 8.
