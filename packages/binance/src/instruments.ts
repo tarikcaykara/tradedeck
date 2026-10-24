@@ -41,9 +41,10 @@ const LeverageBrackets = z.array(
 );
 
 /**
- * Builds an instrument, or `null` when its rules are unusable (a zero or
- * missing tick, step or minimum): such a symbol cannot be traded under the
- * domain rules. Positions and orders on it still map by id.
+ * Builds an instrument, or `null` when its rules are unusable: a zero or
+ * missing tick or step (rounding needs both), or a missing minimum. A zero
+ * minimum means "no minimum" and is kept. Positions and orders on a dropped
+ * symbol still map by id.
  */
 function toInstrument(
 	kind: "spot" | "linear",

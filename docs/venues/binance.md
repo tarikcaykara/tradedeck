@@ -292,8 +292,9 @@ and `openOrders`, futures v3 `balance` and `positionRisk`, `symbolConfig`, `open
     market 1).
   - Only `TRADING` symbols: spot asks with `symbolStatus=TRADING` (5.95 MB / 1383 symbols instead
     of 17.8 MB / 3736, most of the rest `BREAK`); futures has no such parameter and is filtered
-    client-side (604 of 742 on Demo). A symbol with a zero or missing tick, step, minimum quantity
-    or minimum notional is dropped (seen once: a `PENDING_TRADING` futures symbol with tick `0`).
+    client-side (604 of 742 on Demo). A symbol with a zero or missing tick or step, or a missing
+    minimum quantity or minimum notional, is dropped (seen once: a `PENDING_TRADING` futures symbol
+    with tick `0`). A zero minimum means no minimum, and the symbol is kept.
     Positions and orders on a dropped symbol still map — they need only its `InstrumentId`.
   - Futures `maxLeverage` = bracket 1 `initialLeverage` from `GET /fapi/v1/leverageBracket`
     (signed; all bracket values are JSON numbers).

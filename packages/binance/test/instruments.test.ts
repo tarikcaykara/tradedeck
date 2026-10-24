@@ -20,8 +20,14 @@ function adapterFor(scenario: Scenario) {
 const byId = (list: Instrument[], id: string): Instrument | undefined =>
 	list.find((i) => i.id === id);
 
+interface Filter {
+	filterType: string;
+	tickSize?: string;
+	notional?: string;
+}
+
 interface ExchangeInfoBody {
-	symbols: { symbol: string; filters: { filterType: string }[] }[];
+	symbols: { symbol: string; filters: Filter[] }[];
 }
 
 /** The recorded body of one endpoint, mutable in a cloned scenario. */
@@ -29,6 +35,19 @@ function body<T>(scenario: Scenario, name: keyof Scenario): T {
 	const recording = scenario[name];
 	if (recording === undefined) throw new Error(`no ${name} recording`);
 	return recording.body as T;
+}
+
+/** One filter of a recorded futures symbol, mutable in a cloned scenario. */
+function futuresFilter(
+	scenario: Scenario,
+	symbol: string,
+	type: string,
+): Filter {
+	const filter = body<ExchangeInfoBody>(scenario, "futuresExchangeInfo")
+		.symbols.find((s) => s.symbol === symbol)
+		?.filters.find((f) => f.filterType === type);
+	if (filter === undefined) throw new Error(`no ${symbol} ${type} recording`);
+	return filter;
 }
 
 describe("loadInstruments (oneway recordings)", () => {
@@ -189,6 +208,23 @@ describe("loadInstruments (oneway recordings)", () => {
 		const all = await adapter.loadInstruments(["linear"]);
 		expect(byId(all, "binance:linear:ETHUSDT")?.maxLeverage).toBeNull();
 		expect(byId(all, "binance:linear:BTCUSDT")?.maxLeverage).toBe(125);
+	});
+
+	test("a zero tick drops the symbol", async () => {
+		const scenario = structuredClone(await loadScenario("oneway"));
+		futuresFilter(scenario, "ETHUSDT", "PRICE_FILTER").tickSize = "0";
+		const { adapter } = adapterFor(scenario);
+		const ids = (await adapter.loadInstruments(["linear"])).map((i) => i.id);
+		expect(ids).not.toContain("binance:linear:ETHUSDT");
+		expect(ids).toContain("binance:linear:BTCUSDT");
+	});
+
+	test("a zero minimum notional means no minimum: the symbol is kept", async () => {
+		const scenario = structuredClone(await loadScenario("oneway"));
+		futuresFilter(scenario, "ETHUSDT", "MIN_NOTIONAL").notional = "0";
+		const { adapter } = adapterFor(scenario);
+		const all = await adapter.loadInstruments(["linear"]);
+		expect(byId(all, "binance:linear:ETHUSDT")?.minNotional).toBe("0");
 	});
 
 	test("inverse is rejected", async () => {
