@@ -225,17 +225,29 @@ deprecated on 2024-07-24 with no date `[FC]`.
   `reduceOnly=true`, or hedge `LONG`+`SELL` / `SHORT`+`BUY` are exempt from the `-1008` overload
   throttle.
   https://developers.binance.com/en/docs/products/derivatives-trading-usds-futures/general-info
-- **Domain type mapping** `[INFERENCE]` (confirmed against recordings in M1 issue 6):
+- **Domain type mapping.** Rows marked "recorded" were seen in the Demo recordings of 2026-10-24;
+  the rest come from the docs, `[INFERENCE]`:
 
   | Domain `Order.type` | Spot | USDⓈ-M |
   |---|---|---|
   | `market` | `MARKET` | `MARKET` |
-  | `limit` | `LIMIT`; `LIMIT_MAKER` → `limit` + `post_only` | `LIMIT` |
-  | `stop_market` | `STOP_LOSS` | `STOP_MARKET` (algo) |
+  | `limit` | `LIMIT` (recorded); `LIMIT_MAKER` → `limit` + `post_only` | `LIMIT` |
+  | `stop_market` | `STOP_LOSS` | `STOP_MARKET` (algo; recorded in `openOrders`) |
   | `stop_limit` | `STOP_LOSS_LIMIT` | `STOP` (algo) |
-  | `take_profit_market` | `TAKE_PROFIT` | `TAKE_PROFIT_MARKET` (algo) |
+  | `take_profit_market` | `TAKE_PROFIT` | `TAKE_PROFIT_MARKET` (recorded in both) |
   | `take_profit_limit` | `TAKE_PROFIT_LIMIT` | `TAKE_PROFIT` (algo) |
   | `trailing_stop_market` | — (`trailingDelta` on stop types) | `TRAILING_STOP_MARKET` (algo) |
+- **Where futures TP/SL appear (recorded on Demo 2026-10-24):** a TP/SL attached to an entry order
+  in the web UI (`strategyType: "OTOCO"`) is listed by `GET /fapi/v1/openOrders` as
+  `TAKE_PROFIT_MARKET` / `STOP_MARKET` with `reduceOnly: true`. A TP added to an open position is
+  an algo order in `GET /fapi/v1/openAlgoOrders` (`algoType: "CONDITIONAL"`). The snapshot reads
+  both.
+- **Time in force:** `GTC` / `IOC` / `FOK` → `gtc` / `ioc` / `fok`; `GTX` and `RPI` →
+  `post_only`; `GTD` → `gtd`; `GTE_GTC` → `gtc`. `GTE_GTC` is not in the documented futures enum,
+  yet every recorded TP/SL carries it, in `openOrders` and `openAlgoOrders` alike. The order rests
+  like GTC and expires when its position closes
+  (https://github.com/ViewBlock/binance-api-node/pull/573); `[INFERENCE]` the expiry then arrives
+  as status `EXPIRED`, which maps to `expired`.
 
 ## Filters
 

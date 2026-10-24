@@ -61,6 +61,9 @@ const timeInForce = venueEnum(
 		GTX: "post_only", // futures Good-Till-Crossing
 		RPI: "post_only", // futures Retail Price Improvement, post-only
 		GTD: "gtd",
+		// Undocumented: a position's TP/SL. Rests like GTC and expires when the
+		// position closes; the expiry arrives as status EXPIRED.
+		GTE_GTC: "gtc",
 	} satisfies Record<string, TimeInForce>,
 	"time in force",
 );
