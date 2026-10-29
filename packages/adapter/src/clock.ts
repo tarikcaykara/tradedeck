@@ -65,3 +65,14 @@ export function createServerClock(opts: {
 		},
 	};
 }
+
+/** The timer functions a component schedules with; injected so tests run on a manual clock. */
+export interface Timers {
+	setTimeout(fn: () => void, ms: number): unknown;
+	clearTimeout(handle: unknown): void;
+}
+
+export const systemTimers: Timers = {
+	setTimeout: (fn, ms) => globalThis.setTimeout(fn, ms),
+	clearTimeout: (handle) => globalThis.clearTimeout(handle as Timer),
+};

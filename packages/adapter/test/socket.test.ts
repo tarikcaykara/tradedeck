@@ -255,4 +255,92 @@ describe("createReconnectingSocket", () => {
 		expect(socket.send("x")).toBe(true);
 		expect(await got).toBe("x");
 	});
+
+	test("a healthy peer survives the heartbeat", async () => {
+		const fake = serve({});
+		const log = statusLog();
+		socket = createReconnectingSocket({
+			url: () => fake.url,
+			onMessage: () => {},
+			onStatus: log.onStatus,
+			heartbeatMs: 100,
+		});
+		await log.until(() => log.count("open") === 1);
+		// Real wait: six intervals of real pings answered by a real server.
+		await Bun.sleep(600);
+		expect(fake.connections()).toBe(1);
+		expect(log.count("closed")).toBe(0);
+	});
+
+	test("a silent peer is terminated and reconnected", async () => {
+		// Opens, then never answers a ping.
+		class Silent {
+			readyState = 0;
+			onopen: (() => void) | null = null;
+			onclose: ((e: { code: number; reason: string }) => void) | null = null;
+			constructor() {
+				// After the socket has assigned its handlers.
+				queueMicrotask(() => {
+					this.readyState = 1;
+					this.onopen?.();
+				});
+			}
+			addEventListener() {}
+			ping() {}
+			terminate() {
+				this.readyState = 3;
+				queueMicrotask(() => this.onclose?.({ code: 1006, reason: "" }));
+			}
+			close() {
+				this.readyState = 3;
+			}
+		}
+		const log = statusLog();
+		socket = createReconnectingSocket({
+			url: () => "ws://127.0.0.1:1",
+			onMessage: () => {},
+			onStatus: log.onStatus,
+			WebSocket: Silent as unknown as WebSocketCtor,
+			random: () => 0,
+			initialDelayMs: 4,
+			heartbeatMs: 20,
+		});
+		await log.until(() => log.count("connecting") === 2);
+		expect(log.statuses.slice(0, 4)).toEqual([
+			{ state: "connecting", attempt: 1 },
+			{ state: "open" },
+			{
+				state: "closed",
+				code: 1006,
+				reason: "heartbeat timeout",
+				retryInMs: 2,
+			},
+			{ state: "connecting", attempt: 2 },
+		]);
+	});
+
+	test("reconnect() drops the open connection and connects again", async () => {
+		const fake = serve({});
+		const log = statusLog();
+		let urls = 0;
+		socket = createReconnectingSocket({
+			url: () => {
+				urls++;
+				return fake.url;
+			},
+			onMessage: () => {},
+			onStatus: log.onStatus,
+			random: () => 0,
+			initialDelayMs: 4,
+		});
+		await log.until(() => log.count("open") === 1);
+		socket.reconnect();
+		await log.until(() => log.count("open") === 2);
+		expect(fake.connections()).toBe(2);
+		expect(urls).toBe(2);
+		expect(log.statuses[2]).toMatchObject({
+			state: "closed",
+			reason: "reconnect",
+		});
+	});
 });
