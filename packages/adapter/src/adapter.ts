@@ -23,13 +23,17 @@ export interface KindCapabilities {
 	conditionalOrders: "inline" | "separate_api" | "none";
 }
 
-/** Callbacks of the private account stream. */
+/** Callbacks of the private account stream (architecture §6). */
 export interface AccountHandlers {
+	/** Full account state after the streams connect and after every resync; replaces, never merges (§6). */
+	onSnapshot(s: AccountSnapshot): void;
 	onBalance(b: Balance): void;
 	onPosition(p: Position): void;
 	onOrder(o: Order): void;
 	onFill(f: Fill): void;
 	onStatus(s: AccountStatus): void;
+	/** A failure the subscription recovers from or keeps retrying: snapshot, decode, keepalive, re-read, subscribe. For logs; never carries credentials. */
+	onError(err: Error): void;
 }
 
 /**

@@ -33,7 +33,7 @@ const SpotAccount = z.object({
 	),
 });
 
-const FuturesBalances = z.array(
+export const FuturesBalances = z.array(
 	z.object({
 		asset: z.string(),
 		balance: venueDecimal,
@@ -41,7 +41,7 @@ const FuturesBalances = z.array(
 	}),
 );
 
-const PositionRisk = z.array(
+export const PositionRisk = z.array(
 	z.object({
 		symbol: z.string().min(1),
 		positionSide,
@@ -54,7 +54,7 @@ const PositionRisk = z.array(
 	}),
 );
 
-const SymbolConfigs = z.array(
+export const SymbolConfigs = z.array(
 	z.object({
 		symbol: z.string(),
 		marginType: venueEnum(
@@ -69,36 +69,16 @@ const SymbolConfigs = z.array(
 );
 
 /**
- * Spot balances, futures wallet balances, futures positions and every open
- * order, conditional (algo) orders included. Any failing request fails the
- * whole snapshot: a resync replaces state and never merges (architecture §6).
+ * The non-zero rows of `positionRisk`, completed with leverage and margin
+ * mode from `symbolConfig`: v3 positionRisk carries neither.
  */
-export async function fetchSnapshot(
-	http: BinanceHttp,
+export function toPositions(
 	accountId: string,
-	now: () => number,
-): Promise<AccountSnapshot> {
-	const [
-		spotAccount,
-		spotOrders,
-		futuresBalances,
-		positionRisk,
-		symbolConfigs,
-		futuresOrders,
-		algoOrders,
-	] = await Promise.all([
-		http.request(ENDPOINTS.spotAccount, SpotAccount),
-		http.request(ENDPOINTS.spotOpenOrders, SpotOpenOrders),
-		http.request(ENDPOINTS.futuresBalance, FuturesBalances),
-		http.request(ENDPOINTS.positionRisk, PositionRisk),
-		http.request(ENDPOINTS.symbolConfig, SymbolConfigs),
-		http.request(ENDPOINTS.futuresOpenOrders, FuturesOpenOrders),
-		http.request(ENDPOINTS.openAlgoOrders, OpenAlgoOrders),
-	]);
-
-	// v3 positionRisk carries neither leverage nor margin type.
-	const config = new Map(symbolConfigs.map((c) => [c.symbol, c]));
-	const positions = positionRisk.flatMap((p): Position[] => {
+	risk: z.infer<typeof PositionRisk>,
+	configs: z.infer<typeof SymbolConfigs>,
+): Position[] {
+	const config = new Map(configs.map((c) => [c.symbol, c]));
+	return risk.flatMap((p): Position[] => {
 		if (isZero(p.positionAmt)) return [];
 		const c = config.get(p.symbol);
 		if (c === undefined) {
@@ -137,6 +117,55 @@ export async function fetchSnapshot(
 			},
 		];
 	});
+}
+
+/**
+ * A futures wallet row, or null when it is all zero. `balance` is the wallet
+ * balance (uPnL excluded); what can be moved out of the futures wallet is
+ * free, the rest is margin in use.
+ */
+export function toFuturesBalance(
+	accountId: string,
+	row: z.infer<typeof FuturesBalances>[number],
+): Balance | null {
+	if (isZero(row.balance) && isZero(row.maxWithdrawAmount)) return null;
+	return {
+		accountId,
+		scope: "derivs",
+		asset: row.asset,
+		free: row.maxWithdrawAmount,
+		locked: minusFloorZero(row.balance, row.maxWithdrawAmount),
+		total: row.balance,
+	};
+}
+
+/**
+ * Spot balances, futures wallet balances, futures positions and every open
+ * order, conditional (algo) orders included. Any failing request fails the
+ * whole snapshot: a resync replaces state and never merges (architecture §6).
+ */
+export async function fetchSnapshot(
+	http: BinanceHttp,
+	accountId: string,
+	now: () => number,
+): Promise<AccountSnapshot> {
+	const [
+		spotAccount,
+		spotOrders,
+		futuresBalances,
+		positionRisk,
+		symbolConfigs,
+		futuresOrders,
+		algoOrders,
+	] = await Promise.all([
+		http.request(ENDPOINTS.spotAccount, SpotAccount),
+		http.request(ENDPOINTS.spotOpenOrders, SpotOpenOrders),
+		http.request(ENDPOINTS.futuresBalance, FuturesBalances),
+		http.request(ENDPOINTS.positionRisk, PositionRisk),
+		http.request(ENDPOINTS.symbolConfig, SymbolConfigs),
+		http.request(ENDPOINTS.futuresOpenOrders, FuturesOpenOrders),
+		http.request(ENDPOINTS.openAlgoOrders, OpenAlgoOrders),
+	]);
 
 	return {
 		accountId,
@@ -151,22 +180,9 @@ export async function fetchSnapshot(
 					total: add(b.free, b.locked),
 				}),
 			),
-			...futuresBalances
-				.filter((b) => !(isZero(b.balance) && isZero(b.maxWithdrawAmount)))
-				// `balance` is the wallet balance (uPnL excluded); what can be moved
-				// out of the futures wallet is free, the rest is margin in use.
-				.map(
-					(b): Balance => ({
-						accountId,
-						scope: "derivs",
-						asset: b.asset,
-						free: b.maxWithdrawAmount,
-						locked: minusFloorZero(b.balance, b.maxWithdrawAmount),
-						total: b.balance,
-					}),
-				),
+			...futuresBalances.flatMap((b) => toFuturesBalance(accountId, b) ?? []),
 		],
-		positions,
+		positions: toPositions(accountId, positionRisk, symbolConfigs),
 		openOrders: [
 			...spotOrders.map((o) => spotOrder(accountId, o)),
 			...futuresOrders.map((o) => futuresOrder(accountId, o)),
