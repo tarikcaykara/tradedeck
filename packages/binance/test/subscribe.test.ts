@@ -178,6 +178,17 @@ describe("subscribe: lifecycle", () => {
 		expect(h.calls).toEqual([]);
 		expect(h.clock.pending()).toBe(0);
 	});
+
+	test("unsubscribing from a handler stops the rest of that dispatch", async () => {
+		const h = await live();
+		h.onCall = (call) => {
+			if (call[0] === "order") h.unsubscribe();
+		};
+		h.pushSpot(
+			executionReport({ x: "TRADE", X: "FILLED", l: "0.0002", L: "1", t: 5 }),
+		);
+		expect(kinds(h.calls)).toEqual(["order"]);
+	});
 });
 
 describe("subscribe: timers", () => {

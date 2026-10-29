@@ -53,6 +53,8 @@ export interface AccountHarness {
 	requests: string[];
 	/** Answers a request before the defaults; `undefined` falls through. */
 	route: ((req: Request) => Response | undefined) | null;
+	/** Runs after each call is logged, e.g. to unsubscribe mid-dispatch. */
+	onCall: ((call: Call) => void) | null;
 	/** Holds every request to `path` until the returned release is called. */
 	hold(path: string): () => void;
 	/** Returns the calls so far and clears the log. */
@@ -74,14 +76,14 @@ export interface AccountHarness {
 }
 
 function checked<T>(
-	calls: Call[],
+	record: (call: Call) => void,
 	schema: { safeParse(v: unknown): { success: boolean; error?: unknown } },
 	kind: string,
 	value: T,
 	push: (v: T) => Call,
 ): void {
 	const result = schema.safeParse(value);
-	calls.push(
+	record(
 		result.success
 			? push(value)
 			: ["invalid", `${kind}: ${String(result.error)}`],
@@ -150,6 +152,7 @@ export async function startAccount(): Promise<AccountHarness> {
 		calls,
 		requests,
 		route: null,
+		onCall: null,
 		hold(path) {
 			const { promise, resolve } = Promise.withResolvers<void>();
 			holds.set(path, promise);
@@ -199,21 +202,25 @@ export async function startAccount(): Promise<AccountHarness> {
 		unsubscribe: () => unsubscribe(),
 	};
 
+	const record = (call: Call) => {
+		calls.push(call);
+		h.onCall?.(call);
+	};
 	const unsubscribe = adapter.subscribe({
 		onSnapshot: (s) =>
-			checked(calls, AccountSnapshotSchema, "snapshot", s, (v) => [
+			checked(record, AccountSnapshotSchema, "snapshot", s, (v) => [
 				"snapshot",
 				v,
 			]),
 		onBalance: (b) =>
-			checked(calls, BalanceSchema, "balance", b, (v) => ["balance", v]),
+			checked(record, BalanceSchema, "balance", b, (v) => ["balance", v]),
 		onPosition: (p) =>
-			checked(calls, PositionSchema, "position", p, (v) => ["position", v]),
+			checked(record, PositionSchema, "position", p, (v) => ["position", v]),
 		onOrder: (o) =>
-			checked(calls, OrderSchema, "order", o, (v) => ["order", v]),
-		onFill: (f) => checked(calls, FillSchema, "fill", f, (v) => ["fill", v]),
-		onStatus: (s) => calls.push(["status", s]),
-		onError: (err) => calls.push(["error", err]),
+			checked(record, OrderSchema, "order", o, (v) => ["order", v]),
+		onFill: (f) => checked(record, FillSchema, "fill", f, (v) => ["fill", v]),
+		onStatus: (s) => record(["status", s]),
+		onError: (err) => record(["error", err]),
 	});
 	return h;
 }

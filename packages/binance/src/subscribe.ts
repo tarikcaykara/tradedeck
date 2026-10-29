@@ -84,11 +84,36 @@ const asError = (err: unknown): Error =>
  */
 export function subscribeAccount(
 	deps: SubscribeDeps,
-	handlers: AccountHandlers,
+	target: AccountHandlers,
 ): () => void {
 	const { accountId, http, timers } = deps;
 	let status: AccountStatus | null = null;
 	let closed = false;
+	// Every emission checks `closed`: a handler may unsubscribe mid-dispatch,
+	// e.g. between an order and its fill.
+	const handlers: AccountHandlers = {
+		onSnapshot(s) {
+			if (!closed) target.onSnapshot(s);
+		},
+		onBalance(b) {
+			if (!closed) target.onBalance(b);
+		},
+		onPosition(p) {
+			if (!closed) target.onPosition(p);
+		},
+		onOrder(o) {
+			if (!closed) target.onOrder(o);
+		},
+		onFill(f) {
+			if (!closed) target.onFill(f);
+		},
+		onStatus(s) {
+			if (!closed) target.onStatus(s);
+		},
+		onError(err) {
+			if (!closed) target.onError(err);
+		},
+	};
 	// Bumped by every drop, resync and unsubscribe: an async continuation
 	// started under an older generation does nothing.
 	let generation = 0;
@@ -385,7 +410,7 @@ export function subscribeAccount(
 				if (!wasLive) fail();
 			},
 			onError(err) {
-				if (!closed) handlers.onError(err);
+				handlers.onError(err);
 			},
 		};
 	}
