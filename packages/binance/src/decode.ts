@@ -1,16 +1,16 @@
 import { VenueError } from "@tradedeck/adapter";
 import { z } from "zod";
-import type { Endpoint } from "./endpoints.ts";
 
 /**
  * Parses a venue response, or rejects with a `decode` VenueError naming the
- * endpoint and the failing field path. An unknown enum value lands here too:
+ * request and the failing field path. An unknown enum value lands here too:
  * a snapshot fails loudly rather than silently dropping, say, an open order.
+ * `request` is an endpoint, or a stream event as `{ method: "WS", path }`.
  */
 export function decode<T>(
 	schema: z.ZodType<T>,
 	body: unknown,
-	endpoint: Pick<Endpoint, "method" | "path">,
+	request: { readonly method: string; readonly path: string },
 ): T {
 	const result = schema.safeParse(body);
 	if (result.success) return result.data;
@@ -18,8 +18,8 @@ export function decode<T>(
 	const at = issue === undefined ? "" : issue.path.join(".");
 	throw new VenueError({
 		kind: "decode",
-		method: endpoint.method,
-		path: endpoint.path,
+		method: request.method,
+		path: request.path,
 		status: null,
 		code: null,
 		retryAfterMs: null,

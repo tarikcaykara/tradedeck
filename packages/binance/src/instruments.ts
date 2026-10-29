@@ -97,14 +97,14 @@ function toInstrument(
 
 async function spotInstruments(http: BinanceHttp): Promise<Instrument[]> {
 	// `symbolStatus=TRADING` in the endpoint: 6 MB instead of 18 MB.
-	const info = await http.get(ENDPOINTS.spotExchangeInfo, ExchangeInfo);
+	const info = await http.request(ENDPOINTS.spotExchangeInfo, ExchangeInfo);
 	return info.symbols.flatMap((s) => toInstrument("spot", s, null) ?? []);
 }
 
 async function linearInstruments(http: BinanceHttp): Promise<Instrument[]> {
 	const [info, brackets] = await Promise.all([
-		http.get(ENDPOINTS.futuresExchangeInfo, ExchangeInfo),
-		http.get(ENDPOINTS.leverageBracket, LeverageBrackets),
+		http.request(ENDPOINTS.futuresExchangeInfo, ExchangeInfo),
+		http.request(ENDPOINTS.leverageBracket, LeverageBrackets),
 	]);
 	// Max leverage is bracket 1's initial leverage (docs/venues/binance.md).
 	const maxLeverage = new Map(

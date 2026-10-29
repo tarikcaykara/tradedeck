@@ -87,13 +87,13 @@ export async function fetchSnapshot(
 		futuresOrders,
 		algoOrders,
 	] = await Promise.all([
-		http.get(ENDPOINTS.spotAccount, SpotAccount),
-		http.get(ENDPOINTS.spotOpenOrders, SpotOpenOrders),
-		http.get(ENDPOINTS.futuresBalance, FuturesBalances),
-		http.get(ENDPOINTS.positionRisk, PositionRisk),
-		http.get(ENDPOINTS.symbolConfig, SymbolConfigs),
-		http.get(ENDPOINTS.futuresOpenOrders, FuturesOpenOrders),
-		http.get(ENDPOINTS.openAlgoOrders, OpenAlgoOrders),
+		http.request(ENDPOINTS.spotAccount, SpotAccount),
+		http.request(ENDPOINTS.spotOpenOrders, SpotOpenOrders),
+		http.request(ENDPOINTS.futuresBalance, FuturesBalances),
+		http.request(ENDPOINTS.positionRisk, PositionRisk),
+		http.request(ENDPOINTS.symbolConfig, SymbolConfigs),
+		http.request(ENDPOINTS.futuresOpenOrders, FuturesOpenOrders),
+		http.request(ENDPOINTS.openAlgoOrders, OpenAlgoOrders),
 	]);
 
 	// v3 positionRisk carries neither leverage nor margin type.

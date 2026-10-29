@@ -16,7 +16,11 @@ import { API_KEY_HEADER, BINANCE_HOSTS, type Host } from "./env.ts";
 
 export interface BinanceHttp {
 	/** Sends one endpoint request and parses the body with `schema`. */
-	get<T>(endpoint: Endpoint, schema: z.ZodType<T>, params?: Params): Promise<T>;
+	request<T>(
+		endpoint: Endpoint,
+		schema: z.ZodType<T>,
+		params?: Params,
+	): Promise<T>;
 }
 
 const ServerTime = z.object({ serverTime: z.number().int() });
@@ -63,7 +67,7 @@ export function createBinanceHttp(opts: {
 	};
 
 	return {
-		async get(endpoint, schema, params) {
+		async request(endpoint, schema, params) {
 			const { client, clock } = byHost[endpoint.host];
 			const request = {
 				method: endpoint.method,

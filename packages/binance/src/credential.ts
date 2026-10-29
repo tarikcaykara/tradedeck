@@ -31,7 +31,7 @@ export async function verifyCredential(
 	environment: Environment,
 ): Promise<CredentialReport> {
 	if (environment === "live") {
-		const r = await http.get(ENDPOINTS.apiRestrictions, ApiRestrictions);
+		const r = await http.request(ENDPOINTS.apiRestrictions, ApiRestrictions);
 		return {
 			canRead: r.enableReading ?? false,
 			canTradeSpot: r.enableSpotAndMarginTrading ?? false,
@@ -41,8 +41,8 @@ export async function verifyCredential(
 		};
 	}
 	const [spot, futures] = await Promise.all([
-		http.get(ENDPOINTS.spotAccount, AccountFlags),
-		http.get(ENDPOINTS.accountConfig, AccountFlags),
+		http.request(ENDPOINTS.spotAccount, AccountFlags),
+		http.request(ENDPOINTS.accountConfig, AccountFlags),
 	]);
 	return {
 		canRead: true,

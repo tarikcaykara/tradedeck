@@ -1,9 +1,9 @@
-import type { Auth, Params } from "@tradedeck/adapter";
+import type { Auth, HttpMethod, Params } from "@tradedeck/adapter";
 import type { Host } from "./env.ts";
 
 export interface Endpoint {
 	readonly host: Host;
-	readonly method: "GET";
+	readonly method: HttpMethod;
 	readonly path: string;
 	readonly params?: Params;
 	readonly auth: Auth;
@@ -95,6 +95,20 @@ export const ENDPOINTS = {
 		method: "GET",
 		path: "/fapi/v1/openAlgoOrders",
 		auth: "signed",
+	},
+	// The futures user-data stream key: POST returns the account's single
+	// active key (extending it), PUT keeps it alive. DELETE is never sent.
+	listenKey: {
+		host: "futures",
+		method: "POST",
+		path: "/fapi/v1/listenKey",
+		auth: "apiKey",
+	},
+	listenKeyKeepalive: {
+		host: "futures",
+		method: "PUT",
+		path: "/fapi/v1/listenKey",
+		auth: "apiKey",
 	},
 	// Recorded for reference only: no domain field needs them.
 	futuresAccount: {
