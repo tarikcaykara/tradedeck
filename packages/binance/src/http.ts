@@ -13,6 +13,7 @@ import { z } from "zod";
 import { decode } from "./decode.ts";
 import { ENDPOINTS, type Endpoint } from "./endpoints.ts";
 import { API_KEY_HEADER, BINANCE_HOSTS, type Host } from "./env.ts";
+import { wsApiPayload } from "./ws-api.ts";
 
 export interface BinanceHttp {
 	/** Sends one endpoint request and parses the body with `schema`. */
@@ -21,6 +22,13 @@ export interface BinanceHttp {
 		schema: z.ZodType<T>,
 		params?: Params,
 	): Promise<T>;
+	/**
+	 * Spot WS API SIGNED params: `params` plus `apiKey` and `timestamp` (spot
+	 * server clock), signed over `wsApiPayload`, plus `signature`.
+	 */
+	signWsApi(params: Params): Promise<Record<string, string | number | boolean>>;
+	/** Forces the host's clock to resync before its next signed request. */
+	invalidateClock(host: Host): void;
 }
 
 const ServerTime = z.object({ serverTime: z.number().int() });
@@ -80,7 +88,7 @@ export function createBinanceHttp(opts: {
 				body = await client.request(request);
 			} catch (err) {
 				// A stale offset is a definite rejection before processing, and
-				// every M1 call is a read: resync and retry exactly once.
+				// every signed M1 call is a read: resync and retry exactly once.
 				if (
 					!(err instanceof VenueError) ||
 					err.code !== TIMESTAMP_OUTSIDE_RECV_WINDOW ||
@@ -92,6 +100,17 @@ export function createBinanceHttp(opts: {
 				body = await client.request(request);
 			}
 			return decode(schema, body, endpoint);
+		},
+		async signWsApi(params) {
+			const all = {
+				...params,
+				apiKey: signer.apiKey,
+				timestamp: await byHost.spot.clock.timestamp(),
+			};
+			return { ...all, signature: signer.sign(wsApiPayload(all)) };
+		},
+		invalidateClock(host) {
+			byHost[host].clock.invalidate();
 		},
 	};
 }
