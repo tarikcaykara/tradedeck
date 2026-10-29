@@ -133,7 +133,7 @@ and count against the 10 s and 1 min order counters `[FC]`.
 | Futures income (last 3 months; `page` removed) | `GET /fapi/v1/income` | 30 | not planned | https://developers.binance.com/en/docs/catalog/core-trading-derivatives-trading-usd-s-m-futures/api/rest-api/account#get-income-history |
 | Futures user-data listenKey: start | `POST /fapi/v1/listenKey` | 1 | M1 | https://developers.binance.com/en/docs/catalog/core-trading-derivatives-trading-usd-s-m-futures/api/rest-api/user-data-streams#start-user-data-stream |
 | Futures listenKey keepalive | `PUT /fapi/v1/listenKey` | 1 | M1 | https://developers.binance.com/en/docs/catalog/core-trading-derivatives-trading-usd-s-m-futures/api/rest-api/user-data-streams#keepalive-user-data-stream |
-| Futures listenKey close | `DELETE /fapi/v1/listenKey` | 1 | M1 | https://developers.binance.com/en/docs/catalog/core-trading-derivatives-trading-usd-s-m-futures/api/rest-api/user-data-streams#close-user-data-stream |
+| Futures listenKey close | `DELETE /fapi/v1/listenKey` | 1 | not used: `POST` returns the account's one active key, so a `DELETE` would also end every other connection on it; an unkept key lapses after 60 min | https://developers.binance.com/en/docs/catalog/core-trading-derivatives-trading-usd-s-m-futures/api/rest-api/user-data-streams#close-user-data-stream |
 | Spot user-data subscription (WS API) | `userDataStream.subscribe.signature` | 2 | M1 | https://developers.binance.com/en/docs/catalog/core-trading-spot-trading/api/ws-api/user-data-stream#user-data-stream-subscribe-signature |
 | Spot place order | `POST /api/v3/order` | 1 | M2 | https://developers.binance.com/en/docs/catalog/core-trading-spot-trading/api/rest-api/trade#new-order |
 | Spot cancel order | `DELETE /api/v3/order` | 1 | M2 | https://developers.binance.com/en/docs/catalog/core-trading-spot-trading/api/rest-api/trade#delete-order |
@@ -183,34 +183,82 @@ and `openOrders`, futures v3 `balance` and `positionRisk`, `symbolConfig`, `open
 
 ## Private streams
 
+`subscribe()` (M1 issue 7) opens both streams, snapshots once both are up, and goes `live`
+(architecture §6). Code: `packages/binance/src/user-streams.ts` (connections),
+`events.ts` (decoding and mapping), `subscribe.ts` (status, buffering, resync, re-reads).
+
 **Spot** — WS API `userDataStream.subscribe.signature` on the spot WS API host (`live`
 `wss://ws-api.binance.com:443/ws-api/v3`, `demo` `wss://demo-ws-api.binance.com/ws-api/v3`).
 - Works without `session.logon` and with any key type, HMAC included `[SC]`.
-- Events carry `subscriptionId`; one session may hold several subscriptions;
-  `userDataStream.unsubscribe` takes a `subscriptionId` `[SC]`. `session.logout` does not close
-  `subscribe.signature` subscriptions (`[SDK]` `clients/spot/src/websocket-api/modules/user-data-stream-api.ts`).
+- SIGNED params: `apiKey`, `timestamp` (spot server clock) and `signature` over every other
+  param sorted by name as `k=v` joined by `&`, **not** percent-encoded, signed over UTF-8; HMAC →
+  hex, Ed25519 → base64 sent as is. `recvWindow` is optional (default 5000) and not sent. Both
+  doc vectors are reproduced in `packages/binance/test/ws-api.test.ts`.
+  https://github.com/binance/binance-spot-api-docs/blob/master/web-socket-api.md
+- Answer `status: 200` → the stream is up. Any other answer is an error with the venue code
+  (`-1021` also resyncs the spot clock), and the connection is replaced; so is a request with no
+  answer within 10 s. Demo answers a malformed request `400` / `-1100` (probed 2026-10-29).
 - Events: `executionReport`, `outboundAccountPosition`, `balanceUpdate`, `listStatus`,
-  `listenKeyExpired`, `serverShutdown`; `outboundAccountInfo` is deprecated.
-  https://developers.binance.com/en/docs/products/spot/user-data-stream, `[SC]`
+  `externalLockUpdate`, `eventStreamTerminated`, `serverShutdown`; `outboundAccountInfo` is
+  deprecated. https://developers.binance.com/en/docs/products/spot/user-data-stream, `[SC]`
+- Events arrive as `{ subscriptionId, event: { e, … } }`; `serverShutdown` comes without
+  `subscriptionId`. `serverShutdown` and `eventStreamTerminated` reconnect. One session may hold
+  several subscriptions; `userDataStream.unsubscribe` takes a `subscriptionId` `[SC]`.
+- A connection lives 24 h; the server pings every 20 s and drops a client that does not pong
+  within 1 min (the Bun client pongs automatically). The adapter replaces it at 23 h.
 - Alternatives not chosen: `userDataStream.subscribe` after `session.logon` (Ed25519 only) `[SC]`;
   listen token `POST /sapi/v1/userListenToken` + `userDataStream.subscribe.listenToken`, token valid
   24 h, documented under Margin
   https://developers.binance.com/en/docs/products/margin-trading/listen-token-data-stream.
 - Deprecated: REST `POST/PUT/DELETE /api/v3/userDataStream` and WS `userDataStream.start/ping/stop`
   (announced 2025-04-07, no removal date); `/api/v1/userDataStream` retired 2026-03-25 `[SC]`.
+  https://github.com/binance/binance-spot-api-docs/blob/master/user-data-stream.md
 
-**USDⓈ-M futures** — REST listenKey, then `wss://fstream.binance.com/private/ws/<listenKey>`.
-- `POST /fapi/v1/listenKey` creates; a key is valid 60 min; `PUT` extends it; error `-1125` means
-  create a new one; a connection lives at most 24 h — reconnect before that.
+**USDⓈ-M futures** — REST listenKey, then `<host>/private/ws/<listenKey>`.
+- `POST /fapi/v1/listenKey` before every connect: on an account with an active key it returns the
+  same key and extends it 60 min. `PUT` every 30 min keeps it; `-1125` ("This listenKey does not
+  exist") reconnects with a new `POST`; any other keepalive error is reported and the schedule
+  kept. `listenKeyExpired` reconnects. `DELETE` is never sent (Endpoints).
+- A connection lives 24 h; the adapter replaces it at 23 h.
+- Same-type events on one connection are strictly ordered by `T` and `E`.
   https://developers.binance.com/en/docs/products/derivatives-trading-usds-futures/user-data-streams
 - Legacy `wss://fstream.binance.com/ws` and `/stream` were to be decommissioned 2026-04-23; market
   data lives under `/market` and `/public`.
   https://developers.binance.com/en/docs/products/derivatives-trading-usds-futures/websocket-market-streams/Important-WebSocket-Change-Notice
 - Events: `ACCOUNT_UPDATE` (the `a` object carries `S` for funding-fee events since 2026-08-07),
-  `ORDER_TRADE_UPDATE` (execution type `AMENDMENT` exists), `TRADE_LITE`, `ACCOUNT_CONFIG_UPDATE`,
-  `MARGIN_CALL`, `STRATEGY_UPDATE`, `ALGO_UPDATE`, `listenKeyExpired`.
-  `CONDITIONAL_ORDER_TRIGGER_REJECT` is deprecated since 2025-12-15 `[FC]`.
-- Sequence events across types by the `E` field (event time).
+  `ORDER_TRADE_UPDATE` (execution types `NEW`, `CANCELED`, `CALCULATED` for a liquidation,
+  `EXPIRED`, `TRADE`, `AMENDMENT`), `TRADE_LITE`, `ACCOUNT_CONFIG_UPDATE`, `MARGIN_CALL`,
+  `STRATEGY_UPDATE`, `GRID_UPDATE`, `ALGO_UPDATE`, `listenKeyExpired`.
+  `CONDITIONAL_ORDER_TRIGGER_REJECT` is deprecated since 2025-12-15 `[FC]`. Field lists:
+  `[SDK]` `clients/derivatives-trading-usds-futures/src/websocket-streams/types/`.
+
+**Mapping** (decimals pass through `venueDecimal`; enums reuse the Order rules maps below):
+
+| Event | Emits |
+|---|---|
+| spot `executionReport` | Order: `venueOrderId` `i`, `clientOrderId` `C` when non-empty (a cancel's own id) else `c`, `LIMIT_MAKER` → post-only, `price`/`triggerPrice` from `p`/`P` (0 → null), `createdAt` `O`, `updatedAt` `T`. With `x = TRADE` also a Fill: `t`, `l` @ `L`, fee `n` in `N` |
+| spot `outboundAccountPosition` | One spot Balance per row; absolute `f`/`l`, `total = f + l` |
+| futures `ORDER_TRADE_UPDATE` | Order from `o`: `reduceOnly = R ‖ cp`, a trailing stop's trigger is `AP`, `updatedAt` `o.T`. `LIQUIDATION` type → `market`. With `x ∈ {TRADE, CALCULATED}` also a Fill: `t`, `l` @ `L`, fee `n` (absent → `"0"`), realized PnL `rp` |
+| futures `ALGO_UPDATE` | Order from `o`: `aid`, `caid`, status via the algo-status map, trigger `tp` (also for a trailing stop: the event has no activation price), `filledQty` `"0"`, `updatedAt` event `T` |
+| futures `ACCOUNT_UPDATE` | REST re-read of every symbol in `a.P` (`positionRisk` + `symbolConfig` with `symbol`) and of `/fapi/v3/balance` for the assets in `a.B` |
+| futures `ACCOUNT_CONFIG_UPDATE` with `ac` | Re-read of `ac.s` when a position is held on it |
+
+- **Why re-read:** `ACCOUNT_UPDATE.a.P` carries no mark price, liquidation price or leverage, and
+  `a.B` no free/locked split. A re-read costs about 15 weight per burst (5 + 5 + 5) against 2400 a
+  minute; reads of one symbol coalesce (one in flight, at most one more queued). A position the
+  re-read no longer returns is emitted with size `"0"`, `unrealizedPnl` `"0"` and the event time;
+  a named asset missing or all zero in the wallet is emitted as a zero balance.
+- **Creation time:** futures events carry none. It comes from the snapshot's open orders, from
+  `ORDER_TRADE_UPDATE` with `x = NEW` (`o.T`) or `ALGO_UPDATE` with `X = NEW` (event `T`), else the
+  event time.
+- **Fee asset:** `N`, or `""` without commission; a non-zero fee without `N` is a decode error.
+- **Ignored:** spot `balanceUpdate` and `externalLockUpdate` (deltas; `outboundAccountPosition`
+  follows), `listStatus` (its legs arrive as `executionReport`s); futures `TRADE_LITE` (the same
+  trade as `ORDER_TRADE_UPDATE`), `MARGIN_CALL`, `STRATEGY_UPDATE`, `GRID_UPDATE`,
+  `CONDITIONAL_ORDER_TRIGGER_REJECT`, `ACCOUNT_CONFIG_UPDATE` without `ac`; any type not listed.
+- **Decode failures:** a listed event that does not match its schema (e.g. an unknown order
+  status) is a `decode` `VenueError` with `method: "WS"` and `path: "<spot|futures> <e>"`, and the
+  account re-snapshots without reconnecting.
 
 ## Order rules
 
@@ -321,7 +369,8 @@ and `openOrders`, futures v3 `balance` and `positionRisk`, `symbolConfig`, `open
 
 ## Recordings
 
-Adapter tests replay Binance Demo responses from `packages/binance/__recordings__/demo/<scenario>/`.
+Adapter tests replay Binance Demo responses from `packages/binance/__recordings__/demo/<scenario>/`
+and Demo user-data events from `packages/binance/__recordings__/demo/streams/`.
 
 - **Recorder:** `bun run record:binance` (`apps/cli/src/record/`), owner-run, Demo only.
   - Ed25519 (default): it generates the keypair in memory and prints the public-key PEM unframed,
@@ -329,13 +378,22 @@ Adapter tests replay Binance Demo responses from `packages/binance/__recordings_
   - The API key (and HMAC secret) come from hidden prompts; nothing is written but the recordings.
   - It sends exactly the adapter's endpoint table (`packages/binance/src/endpoints.ts`): scenario
     `oneway`, then optionally `hedge` after the owner switches Demo futures to Hedge Mode.
+    Endpoints that share a path (`POST` and `PUT /fapi/v1/listenKey`) are told apart by method.
+- **Stream recorder:** `bun run record:binance-streams` (`apps/cli/src/record/binance-streams.ts`),
+  owner-run, Demo only, same credential prompts.
+  - It opens the raw spot and futures user-data streams and walks the owner through scripted steps
+    on demo.binance.com, one Enter per step; each step's raw events, scrubbed like a REST body, go
+    to `streams/user-data.json` (`{ note, steps: [{ name, instruction, events: [{ stream, event }] }] }`).
+  - Alongside, the adapter's own `subscribe()` prints every callback (the Demo smoke), and a probe
+    on the legacy futures path `/ws/<listenKey>` counts its events.
+  - Ctrl+C writes nothing; no listen key, URL or signature is printed or stored.
 - **File format:** one `<endpoint>.json` per request:
   `{ request: { host, method, path, params }, status, contentType, body, note? }`. Non-2xx
   answers are kept, e.g. the `/sapi` 404 page as text.
 - **Scrubbing:** `signature`, `timestamp` and `recvWindow` are dropped from the params, and no
   header is stored. Values under `apiKey`, `listenKey`, `uid`, `accountAlias` and `tradeGroupId`
   become placeholders of the same JSON type at any depth. `packages/binance/test/recording.test.ts`
-  guards every committed file.
+  guards every committed file, stream recordings included.
 - **Trimming:** `exchangeInfo`, `leverageBracket` and `symbolConfig` keep a fixed set
   (`BTCUSDT`, `ETHUSDT`, `ETHBTC` on spot, `币安人生USDT`) plus:
   - every symbol held or with an order;
@@ -388,7 +446,9 @@ Carried from research; each item names where it gets settled.
   `doctor` (M1 issue 13) surfaces a failing credential either way.
 - **Demo futures stream paths:** whether `demo-fstream` uses the same `/private/ws/<listenKey>`
   path and `/market` / `/public` split as live — M1 issues 7 and 8.
-- **Futures mark-price stream path** under `/market` — M1 issue 8.
+- **Futures mark-price stream path** under `/market` — M1 issue 8. On Demo,
+  `wss://demo-fstream.binance.com/market/ws/btcusdt@markPrice` streams `markPriceUpdate`
+  (unauthenticated probe, 2026-10-29); live is not called from development.
 - **`testnet.binancefuture.com`:** still referenced by the futures WS API doc and the SDK README;
   whether it accepts traffic is unknown. Not used — Demo is authoritative.
 - **Spot `REQUEST_WEIGHT` per minute:** read from `/api/v3/exchangeInfo` at runtime.

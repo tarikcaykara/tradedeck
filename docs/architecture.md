@@ -214,11 +214,13 @@ interface ExchangeAdapter {
   loadInstruments(kinds: InstrumentKind[]): Promise<Instrument[]>;
   fetchSnapshot(): Promise<AccountSnapshot>;
   subscribe(handlers: {
+    onSnapshot(s: AccountSnapshot): void;   // after connect and every resync; replaces, never merges
     onBalance(b: Balance): void;
     onPosition(p: Position): void;
     onOrder(o: Order): void;
     onFill(f: Fill): void;
     onStatus(s: AccountStatus): void;
+    onError(err: Error): void;              // recovered or retried failures; for logs, no credentials
   }): () => void;                                         // returns unsubscribe
   subscribePrices(instrumentIds: InstrumentId[], onPrice: (p: PriceUpdate) => void): () => void;
   fetchFills(instrumentId: InstrumentId, sinceTs: number): Promise<Fill[]>;
@@ -277,17 +279,18 @@ interface KindCapabilities {
 }
 
 // The members M1 has implemented so far; it widens to ExchangeAdapter once
-// subscribe (M1 issue 7), subscribePrices (8) and fetchFills (12) land.
+// subscribePrices (M1 issue 8) and fetchFills (12) land.
 type BinanceAdapter = Pick<ExchangeAdapter,
-  'venue' | 'capabilities' | 'verifyCredential' | 'loadInstruments' | 'fetchSnapshot'>;
+  'venue' | 'capabilities' | 'verifyCredential' | 'loadInstruments' | 'fetchSnapshot' | 'subscribe'>;
 
 declare function createBinanceAdapter(opts: {
   accountId: string;              // stamped on every balance, position and order
   environment: Environment;
   credential: Credential;
   fetch?: Fetch;                  // injected in tests; (url, init) => Promise<Response>
+  WebSocket?: WebSocketCtor;      // injected in tests
   now?: () => number;             // injected clock
-  // WebSocket? is added by M1 issue 7, the first member that opens a socket.
+  timers?: Timers;                // injected with the clock; default systemTimers
 }): BinanceAdapter;
 ```
 
@@ -337,20 +340,41 @@ venue: base URLs, the API-key header and the server-time endpoint come from the 
   window. It resyncs after `maxAgeMs` (default 30 min) or `invalidate()` (e.g. on Binance `-1021`);
   concurrent callers share one sync, a sync already in flight when `invalidate()` runs does not
   count, and a failed sync leaves the clock unsynced.
-- **Reconnecting socket** (`createReconnectingSocket`): injectable `WebSocket`, clock and random;
-  the URL is resolved again before every connect (a fresh listen key); statuses `connecting` /
-  `open` / `closed` with `retryInMs`. The delay uses equal jitter: `cap = min(maxDelay, initialDelay
-  × 2^attempt)`, delay uniform in `[cap/2, cap]` (defaults 1 s and 30 s). The backoff resets only
-  after a connection stayed open `stableAfterMs` (default 30 s): a private stream may be silent for
-  long, and detecting a silently dead stream belongs to the resync (§6). `close()` is final.
+- **Reconnecting socket** (`createReconnectingSocket`): injectable `WebSocket`, clock, timers
+  (`Timers`: `setTimeout`/`clearTimeout`, default `systemTimers`) and random; the URL is resolved
+  again before every connect (a fresh listen key); statuses `connecting` / `open` / `closed` with
+  `retryInMs`. The delay uses equal jitter: `cap = min(maxDelay, initialDelay × 2^attempt)`, delay
+  uniform in `[cap/2, cap]` (defaults 1 s and 30 s). The backoff resets only after a connection
+  stayed open `stableAfterMs` (default 30 s): a private stream may be silent for long.
+  - **Heartbeat:** every `heartbeatMs` (default 15 s) while open, the socket is terminated if
+    nothing arrived since the previous tick (a message, ping or pong), else it sends a ping. A
+    silently dead connection is dropped within two intervals and then reconnects like any other
+    close; the `closed` reason is `heartbeat timeout`.
+  - **`reconnect()`** terminates the open connection (reason `reconnect`); the usual backoff
+    connects again. The venue package uses it for a refused subscription, an expired listen key,
+    a server shutdown notice and the daily rotation.
+  - `close()` is final.
 
 ## 6. Streaming & state
 
-- Session start (per account): `fetchSnapshot()`, then `subscribe()`. Status goes `connecting` →
-  `live`.
-- On any private-stream disconnect the account goes `resyncing`; once the stream is back, a fresh
+- Session start (per account): `subscribe()` alone. It emits `connecting` at once, opens the
+  private streams, takes a REST snapshot once they are all up, emits it with `onSnapshot`, then
+  `live`. `fetchSnapshot()` stays on the interface for one-off reads.
+- Events that arrive before a snapshot lands are buffered, then applied in `E` order after
+  `onSnapshot` and before `live`; a drop or resync discards the buffer, because the next snapshot
+  postdates it.
+- On any private-stream drop a `live` account goes `resyncing`; once every stream is back, a fresh
   REST snapshot **replaces** the account's state and the status returns to `live`. A resync never
-  merges into old state. If reconnecting keeps failing, the status is `down` until it succeeds.
+  merges into old state. An event the adapter cannot decode also resyncs (without reconnecting).
+  Three consecutive failures — a stream dropping or failing to connect while not `live`, or a
+  failed snapshot — make the status `down` until the next `live`. A failed snapshot is retried
+  after `min(30 s, 1 s × 2^(failures − 1))`. Statuses are emitted on change only.
+- Streams are rotated before a venue's 24 h connection limit (Binance: at 23 h), which costs one
+  resync a day.
+- When a venue's position or balance events lack fields the domain needs (Binance futures: mark
+  price, liquidation price, leverage, free/locked), the adapter re-reads that symbol's position
+  or the wallet over REST when an event names it, mapped exactly like the snapshot. A position the
+  re-read no longer returns is emitted with size `"0"`.
 - Events are applied in venue event-time order (Binance `E`); an event older than the state it
   would overwrite is dropped.
 - A position with size `"0"` is removed; an order reaching a terminal status (`filled`,
@@ -513,8 +537,10 @@ has a static IP.
 - Adapters: injected `fetch` replaying Demo recordings from `packages/<venue>/__recordings__/`:
   no headers (so no `X-MBX-APIKEY`), no `signature` / `timestamp` / `recvWindow`, and
   identifying values such as `apiKey`, `listenKey` and `uid` scrubbed (`docs/venues/binance.md`,
-  Recordings). Streams run against a local fake WS server (`Bun.serve({ websocket })`) scripted
-  per test.
+  Recordings). Streams run on an in-memory fake `WebSocket` and a manual clock (injected `now`
+  and `timers`), so keepalive, rotation and reconnect timing are tested without waiting; the fake
+  answers pings at once, so the clock can jump hours without a heartbeat timeout. One test per
+  venue runs the subscription against a local `Bun.serve({ websocket })` server.
 - Live smoke runs only against Binance Demo, manually. Development and CI never call live venue
   endpoints.
 - `test/workspace.test.ts` enforces the import graph of §2.

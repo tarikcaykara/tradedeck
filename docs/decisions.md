@@ -236,3 +236,38 @@ mapping is unchanged: a live key reporting `enableWithdrawals`, or missing it, i
 - Demo keys can be added; Demo funds are not real, and a Demo key cannot withdraw.
 - If Binance ever adds a withdrawal permission to Demo keys, or serves `/sapi` on Demo, this
   decision is revisited and Demo reads the key's own permissions.
+
+## 2026-10-29 — Binance user-data streams: subscribe owns snapshot and resync, REST re-reads for positions, transport heartbeat
+
+**Context:** M1 issue 7 (#8) adds the private streams. Architecture §6 asks for a snapshot that
+replaces state after every disconnect, but `AccountHandlers` had no way to deliver one, and
+opening the streams after a separate `fetchSnapshot()` leaves a gap in which events are lost.
+Binance futures `ACCOUNT_UPDATE` carries no mark price, liquidation price or leverage, so a
+position updated from it alone would show a stale liquidation price after a fill. The decision of
+2026-10-23 left detecting a silently dead stream to this issue.
+
+**Decision:**
+- `subscribe()` owns the snapshot: it opens the streams first, buffers their events, snapshots
+  once all are up, emits it through a new `onSnapshot` handler, applies the buffer in `E` order,
+  then goes `live`. Every drop or undecodable event repeats this (`resyncing`); three consecutive
+  failures are `down`. A new `onError` handler reports recovered failures for logs. Session start
+  is `subscribe()` alone.
+- Futures positions and balances are re-read over REST (`positionRisk` + `symbolConfig` per
+  symbol, `/fapi/v3/balance`) whenever an event names them, mapped exactly like the snapshot.
+  Order and fill events are mapped from the stream.
+- The transport socket detects a dead connection: a heartbeat pings every 15 s and terminates a
+  connection that sent nothing for a whole interval. `reconnect()` lets the venue code replace a
+  connection; timers are injectable, so 30 min keepalives and 23 h rotations are tested on a
+  manual clock.
+- Both streams rotate at 23 h, before Binance's 24 h cut. `DELETE /fapi/v1/listenKey` is never
+  sent: `POST` returns the account's one active key, shared by every connection on the account.
+- Spot `balanceUpdate` is ignored: `outboundAccountPosition` follows every balance change with
+  absolute values.
+
+**Consequences:**
+- About 15 request weight per futures position change, against 2400 a minute.
+- A brief resync once a day per account.
+- The store (#11) receives a snapshot through `subscribe()` and drops events older than the state
+  they would overwrite (`Order.updatedAt` and `Position.updatedAt` are venue times).
+- A healthy connection that never answers pings would be dropped every 30 s; the Demo session
+  of #8 is the check that Binance answers them.
