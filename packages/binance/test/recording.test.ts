@@ -6,6 +6,7 @@ import {
 	type Recording,
 	SCRUBBED_KEYS,
 	SCRUBBED_STRING,
+	type StreamRecording,
 	scrubBody,
 	toRecording,
 } from "../src/recording.ts";
@@ -104,15 +105,32 @@ function unscrubbed(value: unknown, at = ""): string[] {
 const files = await Array.fromAsync(
 	new Glob("**/*.json").scan({ cwd: RECORDINGS }),
 ).catch((): string[] => []);
+const isStream = (file: string) => file.split("/").includes("streams");
 
 describe("committed recordings", () => {
-	test.each(files)("%s is scrubbed", async (file) => {
-		const text = await Bun.file(`${RECORDINGS}/${file}`).text();
-		const recording = JSON.parse(text) as Recording;
-		expect(
-			Object.keys(recording.request.params).filter((k) => AUTH_PARAMS.has(k)),
-		).toEqual([]);
-		expect(unscrubbed(recording.body)).toEqual([]);
-		expect(text).not.toMatch(/X-MBX-APIKEY|signature=|timestamp=/i);
-	});
+	test.each(files.filter((f) => !isStream(f)))(
+		"%s is scrubbed",
+		async (file) => {
+			const text = await Bun.file(`${RECORDINGS}/${file}`).text();
+			const recording = JSON.parse(text) as Recording;
+			expect(
+				Object.keys(recording.request.params).filter((k) => AUTH_PARAMS.has(k)),
+			).toEqual([]);
+			expect(unscrubbed(recording.body)).toEqual([]);
+			expect(text).not.toMatch(/X-MBX-APIKEY|signature=|timestamp=/i);
+		},
+	);
+
+	test.each(files.filter(isStream))(
+		"%s is scrubbed and holds events",
+		async (file) => {
+			const text = await Bun.file(`${RECORDINGS}/${file}`).text();
+			const recording = JSON.parse(text) as StreamRecording;
+			expect(unscrubbed(recording)).toEqual([]);
+			expect(text).not.toMatch(/X-MBX-APIKEY|signature=|timestamp=/i);
+			expect(recording.steps.flatMap((s) => s.events).length).toBeGreaterThan(
+				0,
+			);
+		},
+	);
 });

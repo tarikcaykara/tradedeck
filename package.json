@@ -13,7 +13,8 @@
 		"check": "biome check .",
 		"typecheck": "tsc --noEmit",
 		"test": "bun test",
-		"record:binance": "bun apps/cli/src/record/binance.ts"
+		"record:binance": "bun apps/cli/src/record/binance.ts",
+		"record:binance-streams": "bun apps/cli/src/record/binance-streams.ts"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.6.2",

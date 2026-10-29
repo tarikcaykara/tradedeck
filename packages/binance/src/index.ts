@@ -13,6 +13,7 @@ export {
 	type Recording,
 	SCRUBBED_KEYS,
 	SCRUBBED_STRING,
+	type StreamRecording,
 	scrubBody,
 	toRecording,
 	trimSymbols,
