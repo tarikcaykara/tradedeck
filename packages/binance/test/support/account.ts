@@ -26,6 +26,22 @@ import { until } from "./wait.ts";
 export const SPOT_URL = "wss://demo-ws-api.binance.com/ws-api/v3";
 export const FUTURES_URL = "wss://demo-fstream.binance.com/private/ws/";
 
+/** The recorded one-way BTCUSDT position, as the snapshot maps it. */
+export const BTC_POSITION: Position = {
+	accountId: "acc-1",
+	instrumentId: "binance:linear:BTCUSDT",
+	side: "long",
+	positionSide: "both",
+	size: "0.0024",
+	entryPrice: "80345.2",
+	markPrice: "80343.30000000",
+	liquidationPrice: null,
+	unrealizedPnl: "-0.00456000",
+	leverage: 7,
+	marginMode: "cross",
+	updatedAt: 1792865622583,
+};
+
 /** One handler call; `invalid` is an emitted object its strict core schema rejected. */
 export type Call =
 	| ["snapshot", AccountSnapshot]

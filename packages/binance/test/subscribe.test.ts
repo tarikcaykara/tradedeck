@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { VenueError, type WebSocketCtor } from "@tradedeck/adapter";
-import type { AccountStatus, Order, Position } from "@tradedeck/core";
+import type { AccountStatus, Order } from "@tradedeck/core";
 import type { Server, ServerWebSocket } from "bun";
 import { createBinanceAdapter } from "../src/adapter.ts";
 import {
 	type AccountHarness,
+	BTC_POSITION,
 	type Call,
 	startAccount,
 } from "./support/account.ts";
@@ -49,22 +50,6 @@ const errorOf = (calls: Call[]): Error => {
 	const call = calls.find((c) => c[0] === "error");
 	if (call === undefined) throw new Error("no error call");
 	return call[1] as Error;
-};
-
-/** The recorded one-way BTCUSDT position, as the snapshot maps it. */
-const BTC_POSITION: Position = {
-	accountId: "acc-1",
-	instrumentId: "binance:linear:BTCUSDT",
-	side: "long",
-	positionSide: "both",
-	size: "0.0024",
-	entryPrice: "80345.2",
-	markPrice: "80343.30000000",
-	liquidationPrice: null,
-	unrealizedPnl: "-0.00456000",
-	leverage: 7,
-	marginMode: "cross",
-	updatedAt: 1792865622583,
 };
 
 describe("subscribe: lifecycle", () => {
