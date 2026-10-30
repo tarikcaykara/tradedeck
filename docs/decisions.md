@@ -271,4 +271,7 @@ position updated from it alone would show a stale liquidation price after a fill
   they would overwrite (`Order.updatedAt` and `Position.updatedAt` are venue times).
 - A healthy connection that never answered pings would be dropped every 30 s. The #8 Demo
   session (2026-10-30) kept both connections up for the whole ~20-minute recording with no
-  resync, so Binance answers them.
+  resync, through event-free stretches of several minutes on each stream. The heartbeat counts
+  any inbound frame, so this shows only that every 15 s window received one; Binance's documented
+  server pings (spot: every 20 s) cannot fill every window alone, so pongs answering ours are
+  likely but were not logged.
