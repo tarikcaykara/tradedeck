@@ -540,7 +540,8 @@ has a static IP.
   Recordings). Streams run on an in-memory fake `WebSocket` and a manual clock (injected `now`
   and `timers`), so keepalive, rotation and reconnect timing are tested without waiting; the fake
   answers pings at once, so the clock can jump hours without a heartbeat timeout. One test per
-  venue runs the subscription against a local `Bun.serve({ websocket })` server.
+  venue runs the subscription against a local `Bun.serve({ websocket })` server. Recorded Demo
+  user-data events (`__recordings__/demo/streams/`) replay through the same fake sockets.
 - Live smoke runs only against Binance Demo, manually. Development and CI never call live venue
   endpoints.
 - `test/workspace.test.ts` enforces the import graph of §2.
@@ -552,4 +553,4 @@ Copied from `docs/venues/binance.md` (sources there). Demo is authoritative for 
 | Environment | Spot REST | Spot WS API | Spot market streams | USDⓈ-M REST | USDⓈ-M streams |
 |---|---|---|---|---|---|
 | `live` | `https://api.binance.com` | `wss://ws-api.binance.com:443/ws-api/v3` | `wss://stream.binance.com:9443` | `https://fapi.binance.com` | `wss://fstream.binance.com` — private `/private/ws/<listenKey>`, market under `/market` and `/public` |
-| `demo` | `https://demo-api.binance.com` | `wss://demo-ws-api.binance.com/ws-api/v3` | `wss://demo-stream.binance.com` | `https://demo-fapi.binance.com` | `wss://demo-fstream.binance.com` |
+| `demo` | `https://demo-api.binance.com` | `wss://demo-ws-api.binance.com/ws-api/v3` | `wss://demo-stream.binance.com` | `https://demo-fapi.binance.com` | `wss://demo-fstream.binance.com` — private `/private/ws/<listenKey>` (Demo session 2026-10-30); market paths: Unverified |

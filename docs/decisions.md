@@ -269,5 +269,6 @@ position updated from it alone would show a stale liquidation price after a fill
 - A brief resync once a day per account.
 - The store (#11) receives a snapshot through `subscribe()` and drops events older than the state
   they would overwrite (`Order.updatedAt` and `Position.updatedAt` are venue times).
-- A healthy connection that never answers pings would be dropped every 30 s; the Demo session
-  of #8 is the check that Binance answers them.
+- A healthy connection that never answered pings would be dropped every 30 s. The #8 Demo
+  session (2026-10-30) kept both connections up for the whole ~20-minute recording with no
+  resync, so Binance answers them.

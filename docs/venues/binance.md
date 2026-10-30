@@ -83,7 +83,7 @@ Examples for POST /api/v3/order" (verified 2026-10-23). Implemented by the adapt
 | Environment | Spot REST | Spot WS API | Spot market streams | USDⓈ-M REST | USDⓈ-M streams |
 |---|---|---|---|---|---|
 | `live` | `https://api.binance.com` | `wss://ws-api.binance.com:443/ws-api/v3` | `wss://stream.binance.com:9443` | `https://fapi.binance.com` | `wss://fstream.binance.com` — private `/private/ws/<listenKey>`, market under `/market` and `/public` |
-| `demo` | `https://demo-api.binance.com` | `wss://demo-ws-api.binance.com/ws-api/v3` | `wss://demo-stream.binance.com` | `https://demo-fapi.binance.com` | `wss://demo-fstream.binance.com` |
+| `demo` | `https://demo-api.binance.com` | `wss://demo-ws-api.binance.com/ws-api/v3` | `wss://demo-stream.binance.com` | `https://demo-fapi.binance.com` | `wss://demo-fstream.binance.com` — private `/private/ws/<listenKey>` (Demo session 2026-10-30); market paths: Unverified |
 
 - Spot Demo Mode: keys from the Demo Trading section
   (https://demo.binance.com/en/my/settings/api-management); prices and filters mirror live; the
@@ -225,6 +225,8 @@ and `openOrders`, futures v3 `balance` and `positionRisk`, `symbolConfig`, `open
 - Legacy `wss://fstream.binance.com/ws` and `/stream` were to be decommissioned 2026-04-23; market
   data lives under `/market` and `/public`.
   https://developers.binance.com/en/docs/products/derivatives-trading-usds-futures/websocket-market-streams/Important-WebSocket-Change-Notice
+  On Demo the legacy `/ws/<listenKey>` still delivered all 17 private events of the 2026-10-30
+  session alongside `/private`; the adapter uses `/private` only.
 - Events: `ACCOUNT_UPDATE` (the `a` object carries `S` for funding-fee events since 2026-08-07),
   `ORDER_TRADE_UPDATE` (execution types `NEW`, `CANCELED`, `CALCULATED` for a liquidation,
   `EXPIRED`, `TRADE`, `AMENDMENT`), `TRADE_LITE`, `ACCOUNT_CONFIG_UPDATE`, `MARGIN_CALL`,
@@ -239,7 +241,7 @@ and `openOrders`, futures v3 `balance` and `positionRisk`, `symbolConfig`, `open
 | spot `executionReport` | Order: `venueOrderId` `i`, `clientOrderId` `C` when non-empty (a cancel's own id) else `c`, `LIMIT_MAKER` → post-only, `price`/`triggerPrice` from `p`/`P` (0 → null), `createdAt` `O`, `updatedAt` `T`. With `x = TRADE` also a Fill: `t`, `l` @ `L`, fee `n` in `N` |
 | spot `outboundAccountPosition` | One spot Balance per row; absolute `f`/`l`, `total = f + l` |
 | futures `ORDER_TRADE_UPDATE` | Order from `o`: `reduceOnly = R ‖ cp`, a trailing stop's trigger is `AP`, `updatedAt` `o.T`. `LIQUIDATION` type → `market`. With `x ∈ {TRADE, CALCULATED}` also a Fill: `t`, `l` @ `L`, fee `n` (absent → `"0"`), realized PnL `rp` |
-| futures `ALGO_UPDATE` | Order from `o`: `aid`, `caid`, status via the algo-status map, trigger `tp` (also for a trailing stop: the event has no activation price), `filledQty` `"0"`, `updatedAt` event `T` |
+| futures `ALGO_UPDATE` | Order from `o`: `aid`, `caid`, status via the algo-status map, `qty` `q` (`"0"` with `cp`, like the snapshot's `quantity`), `reduceOnly = R ‖ cp`, trigger `tp` (also for a trailing stop: the event has no activation price), `filledQty` `"0"`, `updatedAt` event `T` |
 | futures `ACCOUNT_UPDATE` | REST re-read of every symbol in `a.P` (`positionRisk` + `symbolConfig` with `symbol`) and of `/fapi/v3/balance` for the assets in `a.B` |
 | futures `ACCOUNT_CONFIG_UPDATE` with `ac` | Re-read of `ac.s` when a position is held on it |
 
@@ -405,10 +407,16 @@ and Demo user-data events from `packages/binance/__recordings__/demo/streams/`.
   `note` records the trim.
 - **Replay:** `packages/binance/test/support/replay.ts` answers by host, method, path and the
   non-auth params; anything unrecorded is a 404 listed in `misses`.
-- **Current set (2026-10-24):**
-  - `oneway`: a spot `LIMIT` buy; BTCUSDT cross 7× long with an entry TP/SL; ETHUSDT isolated 3×
-    short.
-  - `hedge`: BTCUSDT `LONG` and `SHORT` 0.0018, with an algo TP on the `LONG`.
+- **Current set:**
+  - `oneway` (2026-10-24): a spot `LIMIT` buy; BTCUSDT cross 7× long with an entry TP/SL;
+    ETHUSDT isolated 3× short.
+  - `hedge` (2026-10-24): BTCUSDT `LONG` and `SHORT` 0.0018, with an algo TP on the `LONG`.
+  - `streams/user-data.json` (2026-10-30, 28 events, Demo key with Reading, Spot & Margin and
+    Futures): a spot `LIMIT` buy placed and cancelled twice (step 1 holds the first cycle and the
+    second placement), a 10 USDT `MARKET` buy; futures leverage 5×, `MARKET` long 0.002, a
+    reduce-only `LIMIT` sell amended and cancelled, a `closePosition` take-profit placed and
+    cancelled, a `MARKET` close in two fills. Steps 6-8 regrouped by hand (bodies unchanged);
+    network cut skipped. Replayed by `packages/binance/test/recorded-streams.test.ts`.
 
   Biome skips `__recordings__` (generated venue data).
 
@@ -444,11 +452,12 @@ Carried from research; each item names where it gets settled.
   90 days; the 2021 validity-period announcement was marked no longer applicable on 2023-10-24
   (https://www.binance.com/en/support/announcement/detail/11e4c2f44e7a47b9b5fc0e479c0b256f).
   `doctor` (M1 issue 13) surfaces a failing credential either way.
-- **Demo futures stream paths:** whether `demo-fstream` uses the same `/private/ws/<listenKey>`
-  path and `/market` / `/public` split as live — M1 issues 7 and 8.
-- **Futures mark-price stream path** under `/market` — M1 issue 8. On Demo,
+- **Demo futures market stream paths** (`/market`, `/public`) and the mark-price stream — M1
+  issue 8. On Demo,
   `wss://demo-fstream.binance.com/market/ws/btcusdt@markPrice` streams `markPriceUpdate`
   (unauthenticated probe, 2026-10-29); live is not called from development.
+- **Key permission for user-data streams:** the 2026-10-30 recording used a Demo key with Reading,
+  Spot & Margin and Futures; whether Reading alone opens both streams is unchecked — M1 issue 9.
 - **`testnet.binancefuture.com`:** still referenced by the futures WS API doc and the SDK README;
   whether it accepts traffic is unknown. Not used — Demo is authoritative.
 - **Spot `REQUEST_WEIGHT` per minute:** read from `/api/v3/exchangeInfo` at runtime.
