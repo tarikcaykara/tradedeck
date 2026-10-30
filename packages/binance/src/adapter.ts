@@ -1,18 +1,22 @@
-import type {
-	ExchangeAdapter,
-	Fetch,
-	KindCapabilities,
+import {
+	type ExchangeAdapter,
+	type Fetch,
+	type KindCapabilities,
+	systemTimers,
+	type Timers,
+	type WebSocketCtor,
 } from "@tradedeck/adapter";
 import type { Credential, Environment, InstrumentKind } from "@tradedeck/core";
 import { verifyCredential } from "./credential.ts";
 import { createBinanceHttp } from "./http.ts";
 import { loadInstruments } from "./instruments.ts";
 import { fetchSnapshot } from "./snapshot.ts";
+import { subscribeAccount } from "./subscribe.ts";
 
 /**
- * The members implemented so far. `subscribe` (M1 issue 7),
- * `subscribePrices` (issue 8) and `fetchFills` (issue 12) widen this to
- * `ExchangeAdapter` as they land; nothing is stubbed.
+ * The members implemented so far. `subscribePrices` (M1 issue 8) and
+ * `fetchFills` (issue 12) widen this to `ExchangeAdapter` as they land;
+ * nothing is stubbed.
  */
 export type BinanceAdapter = Pick<
 	ExchangeAdapter,
@@ -21,6 +25,7 @@ export type BinanceAdapter = Pick<
 	| "verifyCredential"
 	| "loadInstruments"
 	| "fetchSnapshot"
+	| "subscribe"
 >;
 
 /** Architecture §5, Binance values. */
@@ -50,8 +55,12 @@ export function createBinanceAdapter(opts: {
 	credential: Credential;
 	/** Injected in tests. */
 	fetch?: Fetch;
+	/** Injected in tests. */
+	WebSocket?: WebSocketCtor;
 	/** Injected clock. */
 	now?: () => number;
+	/** Injected with the clock; default `systemTimers`. */
+	timers?: Timers;
 }): BinanceAdapter {
 	const now = opts.now ?? Date.now;
 	const http = createBinanceHttp({
@@ -66,5 +75,19 @@ export function createBinanceAdapter(opts: {
 		verifyCredential: () => verifyCredential(http, opts.environment),
 		loadInstruments: (kinds) => loadInstruments(http, kinds),
 		fetchSnapshot: () => fetchSnapshot(http, opts.accountId, now),
+		subscribe: (handlers) =>
+			subscribeAccount(
+				{
+					accountId: opts.accountId,
+					environment: opts.environment,
+					http,
+					now,
+					timers: opts.timers ?? systemTimers,
+					...(opts.WebSocket === undefined
+						? {}
+						: { WebSocket: opts.WebSocket }),
+				},
+				handlers,
+			),
 	};
 }

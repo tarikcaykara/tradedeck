@@ -39,7 +39,7 @@ describe("createBinanceHttp", () => {
 			fetch: venue.fetch,
 			now: () => 1_000_000,
 		});
-		expect(await http.get(ENDPOINTS.spotAccount, Ok)).toEqual({ ok: true });
+		expect(await http.request(ENDPOINTS.spotAccount, Ok)).toEqual({ ok: true });
 		expect(venue.paths()).toEqual([
 			"/api/v3/time",
 			"/api/v3/account",
@@ -56,7 +56,7 @@ describe("createBinanceHttp", () => {
 			fetch: venue.fetch,
 		});
 		const err = await http
-			.get(ENDPOINTS.positionRisk, Ok)
+			.request(ENDPOINTS.positionRisk, Ok)
 			.catch((e: unknown) => e);
 		expect(err).toBeInstanceOf(VenueError);
 		expect((err as VenueError).code).toBe("-1021");
@@ -75,9 +75,9 @@ describe("createBinanceHttp", () => {
 			credential,
 			fetch: venue.fetch,
 		});
-		await expect(http.get(ENDPOINTS.spotAccount, Ok)).rejects.toBeInstanceOf(
-			VenueError,
-		);
+		await expect(
+			http.request(ENDPOINTS.spotAccount, Ok),
+		).rejects.toBeInstanceOf(VenueError);
 		expect(venue.paths().filter((p) => p === "/api/v3/account")).toHaveLength(
 			1,
 		);
@@ -90,14 +90,14 @@ describe("createBinanceHttp", () => {
 			credential,
 			fetch: venue.fetch,
 		});
-		await http.get(ENDPOINTS.spotAccount, Ok);
-		await http.get(ENDPOINTS.spotOpenOrders, Ok);
+		await http.request(ENDPOINTS.spotAccount, Ok);
+		await http.request(ENDPOINTS.spotOpenOrders, Ok);
 		expect(venue.urls.map((u) => new URL(u).origin)).toEqual([
 			"https://api.binance.com",
 			"https://api.binance.com",
 			"https://api.binance.com",
 		]);
-		await http.get(ENDPOINTS.positionRisk, Ok);
+		await http.request(ENDPOINTS.positionRisk, Ok);
 		expect(venue.paths().slice(3)).toEqual([
 			"/fapi/v1/time",
 			"/fapi/v3/positionRisk",
@@ -114,7 +114,7 @@ describe("createBinanceHttp", () => {
 			credential,
 			fetch: venue.fetch,
 		});
-		await http.get(ENDPOINTS.spotAccount, Ok, { extra: 1 });
+		await http.request(ENDPOINTS.spotAccount, Ok, { extra: 1 });
 		expect(venue.urls[1]).toStartWith(
 			"https://demo-api.binance.com/api/v3/account?omitZeroBalances=true&extra=1&recvWindow=5000&timestamp=",
 		);
@@ -128,7 +128,7 @@ describe("createBinanceHttp", () => {
 			fetch: venue.fetch,
 		});
 		const err = await http
-			.get(ENDPOINTS.spotAccount, Ok)
+			.request(ENDPOINTS.spotAccount, Ok)
 			.catch((e: unknown) => e);
 		expect(err).toBeInstanceOf(VenueError);
 		expect((err as VenueError).kind).toBe("decode");

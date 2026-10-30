@@ -59,7 +59,7 @@ export async function recordScenario(opts: {
 		// The time endpoints are recorded when the clocks sync.
 		if (name === "spotTime" || name === "futuresTime") continue;
 		const endpoint = ENDPOINTS[name];
-		await http.get(endpoint, z.unknown()).catch((err: unknown) => {
+		await http.request(endpoint, z.unknown()).catch((err: unknown) => {
 			opts.onWarn?.(
 				`${endpoint.path}: ${err instanceof Error ? err.message : "failed"}`,
 			);
@@ -73,6 +73,7 @@ export async function recordScenario(opts: {
 		const name = names.find(
 			(n) =>
 				ENDPOINTS[n].host === recording.request.host &&
+				ENDPOINTS[n].method === recording.request.method &&
 				ENDPOINTS[n].path === recording.request.path,
 		);
 		if (name !== undefined) recordings[name] = recording;

@@ -21,6 +21,20 @@ export interface Recording {
 	note?: string;
 }
 
+/**
+ * A recorded Demo user-data session, as stored under
+ * `__recordings__/demo/streams/`: the raw events of each owner step, in
+ * arrival order, scrubbed with `scrubBody`.
+ */
+export interface StreamRecording {
+	note: string;
+	steps: Array<{
+		name: string;
+		instruction: string;
+		events: Array<{ stream: "spot" | "futures"; event: unknown }>;
+	}>;
+}
+
 /** Signed-request params: per-request values that must never be stored. */
 export const AUTH_PARAMS: ReadonlySet<string> = new Set([
 	"signature",

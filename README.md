@@ -5,8 +5,9 @@ positions and trade from one screen. Binance first; more CEXes and perp DEXes be
 adapter interface.
 
 **Status:** M1 in progress — workspace, tooling, the core domain model, the venue adapter
-interface with its signed REST and WebSocket transport, and the Binance REST adapter (instruments,
-credential check, account snapshot); nothing user-facing runs yet.
+interface with its signed REST and WebSocket transport, and the Binance adapter (instruments,
+credential check, account snapshot, private user-data streams with resync); nothing user-facing
+runs yet.
 
 ## Safety model
 

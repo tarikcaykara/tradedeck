@@ -4,65 +4,15 @@
  * enter the public repo. The credential is read from hidden prompts, lives in
  * this process only, and is gone when it exits (hard rule 1).
  */
-import { generateKeyPairSync } from "node:crypto";
-import {
-	cancel,
-	confirm,
-	intro,
-	isCancel,
-	log,
-	note,
-	outro,
-	password,
-	select,
-} from "@clack/prompts";
+import { confirm, intro, log, note, outro } from "@clack/prompts";
 import type { Credential } from "@tradedeck/core";
+import { answer, readCredential } from "./prompts.ts";
 import { recordScenario } from "./recorder.ts";
 
 const OUT_DIR = new URL(
 	"../../../../packages/binance/__recordings__/demo/",
 	import.meta.url,
 );
-
-function answer<T>(value: T): Exclude<T, symbol> {
-	if (isCancel(value)) {
-		cancel("Cancelled; nothing written.");
-		process.exit(1);
-	}
-	return value as Exclude<T, symbol>;
-}
-
-async function readCredential(): Promise<Credential> {
-	const kind = answer(
-		await select({
-			message: "Demo API key type",
-			options: [
-				{ value: "ed25519", label: "Ed25519 (self-generated, recommended)" },
-				{ value: "hmac", label: "HMAC (system-generated)" },
-			],
-		}),
-	);
-	if (kind === "ed25519") {
-		const { publicKey, privateKey } = generateKeyPairSync("ed25519");
-		log.step(
-			"Paste this public key into demo.binance.com → API Management → Self-generated; enable Reading only:",
-		);
-		process.stdout.write(
-			`\n${publicKey.export({ type: "spki", format: "pem" }).toString()}\n`,
-		);
-		const apiKey = answer(await password({ message: "Demo API key" }));
-		return {
-			kind,
-			apiKey,
-			privateKeyPem: privateKey
-				.export({ type: "pkcs8", format: "pem" })
-				.toString(),
-		};
-	}
-	const apiKey = answer(await password({ message: "Demo API key" }));
-	const secret = answer(await password({ message: "Demo secret key" }));
-	return { kind: "hmac", apiKey, secret };
-}
 
 async function record(credential: Credential, scenario: string) {
 	const lines = await recordScenario({

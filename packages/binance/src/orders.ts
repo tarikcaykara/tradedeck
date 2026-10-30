@@ -25,7 +25,7 @@ export const positionSide = venueEnum(
 	"position side",
 );
 
-const status = venueEnum(
+export const status = venueEnum(
 	{
 		NEW: "new",
 		PENDING_NEW: "new", // spot: an order-list leg waiting for its trigger leg
@@ -40,7 +40,7 @@ const status = venueEnum(
 	"order status",
 );
 
-const algoStatus = venueEnum(
+export const algoStatus = venueEnum(
 	{
 		NEW: "new",
 		TRIGGERING: "triggered",
@@ -53,7 +53,7 @@ const algoStatus = venueEnum(
 	"algo status",
 );
 
-const timeInForce = venueEnum(
+export const timeInForce = venueEnum(
 	{
 		GTC: "gtc",
 		IOC: "ioc",
@@ -69,7 +69,7 @@ const timeInForce = venueEnum(
 );
 
 /** `LIMIT_MAKER` is spot's post-only limit order: a type, not a time in force. */
-const spotType = venueEnum(
+export const spotType = venueEnum(
 	{
 		MARKET: { type: "market", postOnly: false },
 		LIMIT: { type: "limit", postOnly: false },
@@ -82,8 +82,11 @@ const spotType = venueEnum(
 	"spot order type",
 );
 
-/** Futures `openOrders` types and the Algo Service `orderType`. */
-const futuresType = venueEnum(
+/**
+ * Futures `openOrders` types, the Algo Service `orderType`, and stream order
+ * types. `LIQUIDATION` appears only on the stream: a liquidation's closing order.
+ */
+export const futuresType = venueEnum(
 	{
 		MARKET: "market",
 		LIMIT: "limit",
@@ -92,14 +95,15 @@ const futuresType = venueEnum(
 		TAKE_PROFIT_MARKET: "take_profit_market",
 		TAKE_PROFIT: "take_profit_limit",
 		TRAILING_STOP_MARKET: "trailing_stop_market",
+		LIQUIDATION: "market",
 	} satisfies Record<string, OrderType>,
 	"futures order type",
 );
 
-const timestamp = z.number().int().nonnegative();
+export const timestamp = z.number().int().nonnegative();
 
 /** Binance reports an absent price or trigger as zero. */
-const positiveOrNull = (value: string | undefined): string | null =>
+export const positiveOrNull = (value: string | undefined): string | null =>
 	value !== undefined && isPositive(value) ? value : null;
 
 export const SpotOpenOrders = z.array(
