@@ -7,7 +7,14 @@
 	"exports": {
 		".": "./src/index.ts"
 	},
+	"scripts": {
+		"db:generate": "drizzle-kit generate"
+	},
 	"dependencies": {
-		"@tradedeck/core": "workspace:*"
+		"@tradedeck/core": "workspace:*",
+		"drizzle-orm": "^0.45.4"
+	},
+	"devDependencies": {
+		"drizzle-kit": "^0.31.11"
 	}
 }
