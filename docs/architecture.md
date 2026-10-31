@@ -516,8 +516,12 @@ has a static IP.
 
 ## 10. Persistence
 
-- Database file `~/.local/share/tradedeck/tradedeck.db`, override with `TRADEDECK_DB_PATH`; WAL
-  mode; migrations auto-apply on open.
+- Database file `~/.local/share/tradedeck/tradedeck.db`, override with `TRADEDECK_DB_PATH` (empty
+  counts as unset); `openDb()` creates the directory, sets WAL mode and `foreign_keys = ON` (SQLite
+  leaves it off per connection, which would make the cascade below inert) and applies pending
+  migrations on open.
+- The schema is `packages/db/src/schema.ts`; `bun run db:generate` writes its migrations to
+  `packages/db/drizzle/`. They are committed and never hand-edited.
 - Decimal columns are `TEXT`.
 - M1 tables:
   - `accounts (id TEXT PK, venue, label UNIQUE, environment, credential_kind, created_at)`
@@ -525,6 +529,8 @@ has a static IP.
     venue_order_id, side, qty, price, fee, fee_asset, realized_pnl NULL, ts,
     PK(account_id, instrument_id, venue_trade_id))`
 - M2 adds `order_intents`; M3 adds `accounts.trading_enabled`.
+- `insertFills()` is the only write path for `fills`: a fill whose key is already stored is
+  skipped, never overwritten (venue trades are immutable).
 - The own fills ledger exists because Binance keeps futures trade and income history for only 3
   months and has no spot average-cost endpoint. Spot average cost is `null` unless the ledger
   quantity equals the balance within one step.
@@ -534,6 +540,8 @@ has a static IP.
 
 - `packages/core`: a test for every exported function; known-value fixtures for rounding (tick,
   step, sigfig, side direction), uPnL and average cost.
+- `packages/db`: tests open a fresh database file under the OS temp directory, never the default
+  path, and run the real migrations.
 - Adapters: injected `fetch` replaying Demo recordings from `packages/<venue>/__recordings__/`:
   no headers (so no `X-MBX-APIKEY`), no `signature` / `timestamp` / `recvWindow`, and
   identifying values such as `apiKey`, `listenKey` and `uid` scrubbed (`docs/venues/binance.md`,

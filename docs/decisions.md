@@ -275,3 +275,24 @@ position updated from it alone would show a stale liquidation price after a fill
   any inbound frame, so this shows only that every 15 s window received one; Binance's documented
   server pings (spot: every 20 s) cannot fill every window alone, so pongs answering ours are
   likely but were not logged.
+
+## 2026-10-31 — Stable Drizzle, migrations on open, first-write-wins fills
+
+**Context:** M1 issue 3 (#4) adds the database. Drizzle's npm `latest` is `drizzle-orm` 0.45 /
+`drizzle-kit` 0.31; 1.0 is a release candidate with a different migration folder format. Both the
+server and the CLI open the database, and a venue sync re-reads overlapping trade pages.
+
+**Decision:**
+- `drizzle-orm` 0.45 and `drizzle-kit` 0.31, not the 1.0 RC. `drizzle-kit` is a devDependency of
+  `packages/db`: Bun's isolated linker puts its binary only there.
+- `openDb()` applies pending migrations on every open; there is no separate migrate command. A
+  failed migration closes the handle and throws, so nothing runs on a half-migrated database.
+- Every `fills` write goes through `insertFills()`, `ON CONFLICT DO NOTHING` on
+  `(account_id, instrument_id, venue_trade_id)`: the first write wins.
+
+**Consequences:**
+- Moving to Drizzle 1.0 means running drizzle-kit's one-time migration folder upgrade.
+- A fill the venue later corrected would keep its first version; venue trades are immutable, so
+  none is expected.
+- No `busy_timeout`: a CLI write while the server writes can fail with `SQLITE_BUSY`. #10/#11
+  revisit this if it shows up.
