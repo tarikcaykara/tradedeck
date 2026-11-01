@@ -340,3 +340,25 @@ writes to two stores, SQLite and the OS keychain, that share no transaction.
 - If the rollback itself fails, an orphan row without a keychain entry remains; `keys remove`
   clears it.
 - A failed keychain delete leaves the account in place, so `keys remove` can be retried.
+
+## 2026-11-01 — Test-first acceptance tests; e2e journeys from #12; Demo smoke per milestone
+
+**Context:** After M1 issue 9 the owner asked whether every task should start with an end-to-end
+test. Most work so far is in core and the venue adapter, where integration tests with recordings
+and fake sockets prove behaviour deterministically. A true end-to-end run would need a venue:
+live is forbidden in development (hard rule 9), and Demo needs a credential in CI (hard rule 1)
+and is network-bound and rate-limited. There is no web app before #12.
+
+**Decision:**
+- Every issue writes its acceptance criteria first as failing tests, at the lowest level that can
+  prove them (unit or integration).
+- From #12 on, an issue that changes a user-visible flow also adds an end-to-end journey: a
+  browser drives the web app and the server against a fake venue, in CI. #12 picks the tool.
+- Each implementation milestone (M1–M4) ends with a manual Demo smoke run on the owner's machine
+  and Demo account: the owner does the interactive steps, Claude the non-interactive checks.
+
+**Consequences:**
+- End-to-end journeys stay few and cover user flows only; correctness below the UI stays in fast,
+  deterministic tests.
+- No credential ever enters CI; Demo is exercised by hand, at least once per implementation
+  milestone.

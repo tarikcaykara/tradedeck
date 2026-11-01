@@ -553,6 +553,21 @@ recommended whenever the user has a static IP.
 
 ## 11. Testing
 
+Workflow for every issue (`CLAUDE.md`, Workflow):
+
+1. The acceptance criteria are written first as failing tests, at the lowest level that can prove
+   them: unit tests for core rules, integration tests with recordings and fake sockets for adapters
+   and the server. The code follows.
+2. From #12 on, an issue that changes a user-visible flow also adds an end-to-end journey: a
+   browser drives the web app and the server against a fake venue (recorded responses and a local
+   fake WebSocket), never a live or Demo venue (hard rule 9), and the journeys run in CI. #12 picks
+   the tool and adds the first journeys.
+3. Each implementation milestone (M1–M4) ends with a manual smoke run against Binance Demo on the
+   owner's machine and Demo account: the owner does the interactive steps (adding the key, acting
+   in the Binance UI), and Claude runs the non-interactive checks.
+
+Per package:
+
 - `packages/core`: a test for every exported function; known-value fixtures for rounding (tick,
   step, sigfig, side direction), uPnL and average cost.
 - `packages/db`: tests open a fresh database file under the OS temp directory, never the default
