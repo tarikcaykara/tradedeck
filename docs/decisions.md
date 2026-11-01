@@ -296,3 +296,24 @@ server and the CLI open the database, and a venue sync re-reads overlapping trad
   none is expected.
 - No `busy_timeout`: a CLI write while the server writes can fail with `SQLITE_BUSY`. #10/#11
   revisit this if it shows up.
+
+## 2026-11-01 — Keychain SecretStore: core's CredentialSchema on read, fixed corrupt-entry error
+
+**Context:** M1 issue 5 (#6) stores each credential in the OS keychain as JSON and must Zod-parse
+it on read. The documented import edge was `packages/secrets → core (types only)`, and a parser
+error can quote part of the stored value.
+
+**Decision:**
+- `packages/secrets` imports core's `CredentialSchema` at runtime, so there is one schema and core
+  stays pure. The documented edge becomes `packages/secrets → core`.
+- A corrupt entry (not JSON, or not a `Credential`) throws a fixed message that names only the
+  account id; the parser's own error is dropped. `set` does not validate: its argument is a typed
+  in-process `Credential`.
+- The store is a factory, `createKeychainSecretStore({ backend? })`, like the repo's other
+  injectable components. The default backend `Bun.secrets` is resolved inside the factory, so a
+  store built with a fake never evaluates it.
+
+**Consequences:**
+- A new credential kind becomes storable as soon as core's schema has it.
+- A corrupt entry is repaired with `keys remove` + `keys add` (#10).
+- Tests, including on the Linux CI runner, never touch `Bun.secrets`.

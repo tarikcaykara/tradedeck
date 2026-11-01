@@ -90,7 +90,7 @@ packages/core     → (nothing)
 packages/adapter  → core
 packages/binance  → adapter, core
 packages/db       → core (types only)
-packages/secrets  → core (types only)
+packages/secrets  → core
 apps/server       → core, adapter, binance, db, secrets
 apps/cli          → core, adapter, binance, db, secrets
 apps/web          → core

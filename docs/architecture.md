@@ -46,7 +46,7 @@ packages/core     → (nothing)
 packages/adapter  → core
 packages/binance  → adapter, core
 packages/db       → core (types only)
-packages/secrets  → core (types only)
+packages/secrets  → core
 apps/server       → core, adapter, binance, db, secrets
 apps/cli          → core, adapter, binance, db, secrets
 apps/web          → core
@@ -485,10 +485,13 @@ interface SecretStore {
 }
 ```
 
-- `KeychainSecretStore` (in `packages/secrets`) is the only file that touches `Bun.secrets`
-  (experimental since Bun 1.2.21): service `tradedeck`, name = accountId, value =
+- `createKeychainSecretStore()` (`packages/secrets/src/keychain.ts`) is the only file that touches
+  `Bun.secrets` (experimental since Bun 1.2.21): service `tradedeck`, name = accountId, value =
   `JSON.stringify(credential)`. A headless server deployment later adds another implementation;
-  `Bun.secrets` documents no headless fallback.
+  `Bun.secrets` documents no headless fallback. `get` parses the entry with core's
+  `CredentialSchema` and throws `secrets: keychain entry for account <id> is not a valid
+  credential` on a corrupt entry; the backend is injectable (`opts.backend`), and tests use an
+  in-memory fake.
 - Only `apps/server` and `apps/cli` construct a `SecretStore`. Credentials are never logged,
   persisted elsewhere, or sent to the browser.
 
