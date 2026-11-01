@@ -1,0 +1,40 @@
+# Weekly version-update PRs (docs/decisions.md, 2026-11-01).
+# - A new release is proposed only after a 7-day cooldown; security updates do not wait.
+# - Minor and patch updates are grouped: `money-keys` (the owner reviews and merges) and `other`.
+#   Majors come one by one and are owner-review too (CLAUDE.md, Workflow).
+# - The Bun runtime is bumped by hand, all together: ci.yml `bun-version`, `@types/bun`, `engines`.
+version: 2
+updates:
+  - package-ecosystem: bun
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: build
+      include: scope
+    groups:
+      money-keys:
+        patterns: ["decimal.js", "zod", "drizzle-orm", "@clack/prompts"]
+        update-types: [minor, patch]
+      other:
+        patterns: ["*"]
+        exclude-patterns: ["decimal.js", "zod", "drizzle-orm", "@clack/prompts"]
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "@types/bun"
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci
+      include: scope
+    groups:
+      actions:
+        update-types: [minor, patch]
