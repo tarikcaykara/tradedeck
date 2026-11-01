@@ -11,9 +11,9 @@ credential check, account snapshot, private user-data streams with resync), and 
 
 ## Safety model
 
-- **Keys stay local.** API keys live only in the local server process and the OS keychain. They
-  are entered through a CLI hidden prompt — never through the browser — and are never written to
-  the database, logs or files.
+- **Keys stay local.** API keys live only in the local server and CLI processes and the OS
+  keychain. They are entered through a CLI hidden prompt — never through the browser — and are
+  never written to the database, logs or files.
 - **Withdraw- or transfer-enabled keys are refused.** A key whose exchange reports withdrawal or
   transfer permission is rejected when it is added.
 - **Demo first.** Trading ships against Binance Demo before any real-money account can place an
