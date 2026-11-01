@@ -119,6 +119,9 @@ bun run check && bun run typecheck && bun test   # the gate — green before eve
   (the active gh account is a different one). Never ask for, store or handle credentials.
 - One issue at a time, chosen by the owner. Issue → branch `<type>/<issue>-<slug>` → PR →
   reviewer-agent pass → green CI → squash merge with the PR title as the commit subject.
+- `master` is protected by a ruleset: PR only, squash only, the `gate` check green on a branch
+  that is up to date with `master`, no force-push or deletion, no bypass. When `master` moved after
+  the PR was opened, update the branch (`gh pr update-branch`) before merging.
 - Reviewer-agent pass: before a PR is merged or handed to the owner, an agent that did not write
   the change reviews its diff. Claude fixes or answers every finding and summarises the review in
   the PR body.
@@ -137,9 +140,14 @@ bun run check && bun run typecheck && bun test   # the gate — green before eve
     OrderRouter, `packages/db` or the UI;
   - the fills ledger: its schema, ingestion, deduplication and the coverage rule for average cost;
   - the live-trading flag (hard rule 7) or the server's loopback/Host/Origin guard (hard rule 3);
+  - a Dependabot PR in the `money-keys` group (`decimal.js`, `zod`, `drizzle-orm`,
+    `@clack/prompts`) or any major version update;
   - the hard rules or this list.
 
   Such a PR's body opens with `Owner review: <item>`. Claude stops once CI is green and the review
   is done, tells the owner, and the owner reviews and merges.
+- Dependabot (`.github/dependabot.yml`) opens weekly update PRs. Each one gets the reviewer-agent
+  pass, which reads the changelogs between the two versions, and a green `gate`. Claude merges the
+  `other` and `actions` groups; the owner merges the rest (Owner-review PRs). Nothing auto-merges.
 - Conventional Commits; one logical change per commit; no `Co-Authored-By` trailers.
 - Update `README.md`, `CLAUDE.md` and `docs/` in the same PR as any behaviour change.

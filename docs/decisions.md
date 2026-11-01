@@ -362,3 +362,37 @@ and is network-bound and rate-limited. There is no web app before #12.
   deterministic tests.
 - No credential ever enters CI; Demo is exercised by hand, at least once per implementation
   milestone.
+
+## 2026-11-01 — Protected master, Dependabot with a cooldown, SHA-pinned actions
+
+**Context:** The 2026-11-01 audit found that `master` had no protection (finding 1): hard rule 10
+and the green-`gate` condition (2026-10-21) were enforced only by discipline, and Claude merges with
+the owner's token. Dependabot alerts were off, the CI actions were pinned by movable tags, and the
+public repo handles keys, so a compromised dependency release is the main supply-chain risk.
+Rulesets are free for public repositories.
+
+**Decision:**
+- A `master` ruleset with no bypass actors: PR only, squash only, required `gate` on an
+  up-to-date branch, no force-push, no deletion. Merge commits and rebase merges are off; merged
+  branches are deleted. Required approvals stay 0: GitHub does not let an account approve its own
+  PR, and Claude opens PRs as the owner.
+- Dependabot alerts and private vulnerability reporting are on. Security updates are turned on
+  once `.github/dependabot.yml` is on `master`, so their PRs follow it.
+- Dependabot version updates run weekly for `bun` and `github-actions`. A release is proposed only
+  after 7 days (`cooldown`), since compromised npm releases are usually pulled within days; security
+  updates skip the cooldown. Minor and patch updates are grouped into `money-keys` (`decimal.js`,
+  `zod`, `drizzle-orm`, `@clack/prompts`) and `other`; groups are built from name patterns because
+  Dependabot's `dependency-type` grouping does not support `bun`. Majors come one by one.
+- `money-keys` and every major update are owner-review; Claude merges `other` and `actions` after
+  the reviewer pass and a green `gate`. Nothing auto-merges.
+- CI actions are pinned by commit SHA with a version comment, which Dependabot keeps current, and
+  `actions/checkout` does not persist its token.
+- `@types/bun` is ignored: the Bun runtime is bumped by hand, together with the CI `bun-version`
+  and `engines`.
+
+**Consequences:**
+- The 2026-10-21 consequence "only this rule enforces the green-CI condition" no longer holds:
+  GitHub enforces it.
+- When `master` moves, an open PR must be updated before it can merge; Dependabot rebases its own.
+- A new dependency on the money, keys or ledger path must be added to `money-keys` in both
+  `.github/dependabot.yml` and `CLAUDE.md`.
