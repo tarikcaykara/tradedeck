@@ -562,7 +562,9 @@ Workflow for every issue (`CLAUDE.md`, Workflow):
    browser drives the web app and the server against a fake venue (recorded responses and a local
    fake WebSocket), never a live or Demo venue (hard rule 9), and the journeys run in CI. #12 picks
    the tool and adds the first journeys.
-3. Each milestone ends with a manual smoke run against Binance Demo.
+3. Each implementation milestone (M1–M4) ends with a manual smoke run against Binance Demo on the
+   owner's machine and Demo account: the owner does the interactive steps (adding the key, acting
+   in the Binance UI), and Claude runs the non-interactive checks.
 
 Per package:
 

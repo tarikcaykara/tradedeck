@@ -126,7 +126,7 @@ bun run check && bun run typecheck && bun test   # the gate — green before eve
   1. An issue's acceptance criteria are written first as failing tests, at the lowest level that
      can prove them (unit or integration); the code follows.
   2. From #12 on, an issue that changes a user-visible flow also adds an end-to-end journey.
-  3. Each milestone ends with a Demo smoke run.
+  3. Each implementation milestone (M1–M4) ends with a Demo smoke run on the owner's machine.
 - Owner-review PRs: Claude never merges a PR that touches any of
   - `packages/core`: domain types, decimal rules, PnL, average cost, protocol schemas;
   - keys: `packages/secrets`, credential handling in `apps/server` and `apps/cli`, the CLI `keys`

@@ -354,9 +354,11 @@ and is network-bound and rate-limited. There is no web app before #12.
   prove them (unit or integration).
 - From #12 on, an issue that changes a user-visible flow also adds an end-to-end journey: a
   browser drives the web app and the server against a fake venue, in CI. #12 picks the tool.
-- Each milestone ends with a manual Demo smoke run.
+- Each implementation milestone (M1–M4) ends with a manual Demo smoke run on the owner's machine
+  and Demo account: the owner does the interactive steps, Claude the non-interactive checks.
 
 **Consequences:**
 - End-to-end journeys stay few and cover user flows only; correctness below the UI stays in fast,
   deterministic tests.
-- No credential ever enters CI; Demo is exercised by hand, once per milestone at least.
+- No credential ever enters CI; Demo is exercised by hand, at least once per implementation
+  milestone.
