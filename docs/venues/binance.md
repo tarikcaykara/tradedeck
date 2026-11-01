@@ -47,14 +47,15 @@ endpoint paths, weights and doc links only — tradedeck does not depend on it).
 
   Recorded 2026-10-24: spot `account` and futures `accountConfig` both answer `canTrade: true`
   and `canWithdraw: true` for a Demo key with Reading, Spot & Margin and Futures enabled.
-- **Demo keys always carry trading permissions (observed 2026-11-01):** two self-generated keys,
-  each created to be Reading-only, came out with Enable Reading, Enable Spot & Margin & Stock
-  Trading and Enable Futures checked. The Demo key card offers only Delete, not Edit restrictions.
-  The Demo key form's only other boxes are Enable FIX API Trading and Enable FIX API Reading, with
-  no withdrawal or transfer permission, so `canWithdraw` cannot describe the key. A Reading-only
-  Demo key cannot be made, so whether Demo's `canTrade` is account-level stays open and does not
-  matter: the Demo report's trade flags are `true` either way. Demo funds are virtual, and nothing
-  sends an order before M2.
+- **Demo keys seen so far all carry trading permissions (observed 2026-11-01):** two
+  self-generated keys, each meant to be Reading-only, came out with Enable Reading, Enable Spot &
+  Margin & Stock Trading and Enable Futures checked, like the 2026-10-24 recording key. Their key
+  cards offer only Delete, not Edit restrictions. The Demo key form's only other boxes are Enable
+  FIX API Trading and Enable FIX API Reading, with no withdrawal or transfer permission, so
+  `canWithdraw` cannot describe the key. `[INFERENCE]` Demo grants trading to every key. With no
+  Reading-only Demo key, whether Demo's `canTrade` is account-level stays open and does not matter
+  so far: the Demo report's trade flags have been `true` every time. Demo funds are virtual, and
+  nothing sends an order before M2.
 - **Demo accepts self-generated Ed25519 keys (verified 2026-10-24):** demo.binance.com → API
   Management → Self-generated takes the three-line SPKI PEM (`-----BEGIN PUBLIC KEY-----` …
   `-----END PUBLIC KEY-----`) exactly as `bun run record:binance` prints it, and every signed spot
@@ -473,9 +474,9 @@ Carried from research; each item names where it gets settled.
   User Data Stream (USER_STREAM)"), and the spot docs say only `TRADE` needs a permission beyond a
   new key's default ("By default, an API key cannot `TRADE`",
   https://developers.binance.com/en/docs/products/spot/rest-api#endpoint-security-type), so
-  `[INFERENCE]` Reading alone opens both. Demo cannot check it: its keys always carry trading
-  (Keys & permissions), and with such a key `subscribe()` reached `live` in 3.5 s (2026-11-01).
-  Settled by the first live Reading-only key (server, #11).
+  `[INFERENCE]` Reading alone opens both. Demo has not produced a Reading-only key to check it
+  with (Keys & permissions); with a trading-enabled key `subscribe()` reached `live` in 3.5 s
+  (2026-11-01). Settled by the first live Reading-only key (server, #11).
 - **`testnet.binancefuture.com`:** still referenced by the futures WS API doc and the SDK README;
   whether it accepts traffic is unknown. Not used — Demo is authoritative.
 - **Spot `REQUEST_WEIGHT` per minute:** read from `/api/v3/exchangeInfo` at runtime.

@@ -525,9 +525,9 @@ first and the account second (its `fills` cascade). A missing keychain entry is 
 failed keychain delete keeps the account, so the command can be retried.
 
 Permissions per milestone: live keys have "Enable Reading" only until M3, which adds "Enable Spot &
-Margin Trading" / "Enable Futures". Demo keys always carry Reading, Spot & Margin & Stock Trading
-and Futures (`docs/venues/binance.md`, Keys & permissions). An IP whitelist is recommended whenever
-the user has a static IP.
+Margin Trading" / "Enable Futures". Every Demo key created so far carried Reading, Spot & Margin &
+Stock Trading and Futures (`docs/venues/binance.md`, Keys & permissions). An IP whitelist is
+recommended whenever the user has a static IP.
 
 ## 10. Persistence
 
