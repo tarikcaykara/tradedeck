@@ -58,6 +58,7 @@ describe("verifyCredential — live", () => {
 			canTradeSpot: true,
 			canTradeDerivs: true,
 			canWithdraw: false,
+			canTransfer: false,
 			ipRestricted: true,
 		});
 		expect(paths).toEqual(["/api/v3/time", "/sapi/v1/account/apiRestrictions"]);
@@ -68,6 +69,24 @@ describe("verifyCredential — live", () => {
 		expect((await adapter.verifyCredential()).canWithdraw).toBe(true);
 	});
 
+	test.each([["enableInternalTransfer"], ["permitsUniversalTransfer"]])(
+		"reports transfer permission (%s)",
+		async (flag) => {
+			const { adapter } = live({ ...READ_ONLY, [flag]: true });
+			expect((await adapter.verifyCredential()).canTransfer).toBe(true);
+		},
+	);
+
+	test.each([["enableInternalTransfer"], ["permitsUniversalTransfer"]])(
+		"a missing %s counts as granted, so the key is refused",
+		async (flag) => {
+			const rest: Record<string, unknown> = { ...READ_ONLY };
+			delete rest[flag];
+			const { adapter } = live(rest);
+			expect((await adapter.verifyCredential()).canTransfer).toBe(true);
+		},
+	);
+
 	test("a missing enableWithdrawals counts as granted, so the key is refused", async () => {
 		const { enableWithdrawals: _, ...rest } = READ_ONLY;
 		const { adapter } = live(rest);
@@ -76,17 +95,23 @@ describe("verifyCredential — live", () => {
 			canTradeSpot: false,
 			canTradeDerivs: false,
 			canWithdraw: true,
+			canTransfer: false,
 			ipRestricted: false,
 		});
 	});
 
 	test("missing permission flags count as not granted", async () => {
-		const { adapter } = live({ enableWithdrawals: false });
+		const { adapter } = live({
+			enableWithdrawals: false,
+			enableInternalTransfer: false,
+			permitsUniversalTransfer: false,
+		});
 		expect(await adapter.verifyCredential()).toEqual({
 			canRead: false,
 			canTradeSpot: false,
 			canTradeDerivs: false,
 			canWithdraw: false,
+			canTransfer: false,
 			ipRestricted: false,
 		});
 	});
@@ -130,6 +155,7 @@ describe("verifyCredential — Demo (recorded)", () => {
 			canTradeSpot: true,
 			canTradeDerivs: true,
 			canWithdraw: false,
+			canTransfer: false,
 			ipRestricted: false,
 		});
 		expect(requested.filter((r) => r.includes("/sapi/"))).toEqual([]);

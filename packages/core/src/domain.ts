@@ -219,6 +219,7 @@ export const CredentialReportSchema = z.strictObject({
 	canTradeSpot: z.boolean(),
 	canTradeDerivs: z.boolean(),
 	canWithdraw: z.boolean(),
+	canTransfer: z.boolean(),
 	ipRestricted: z.boolean(),
 });
 export type CredentialReport = z.infer<typeof CredentialReportSchema>;

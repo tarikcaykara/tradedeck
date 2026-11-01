@@ -8,6 +8,8 @@ const ApiRestrictions = z.object({
 	ipRestrict: z.boolean().optional(),
 	enableReading: z.boolean().optional(),
 	enableWithdrawals: z.boolean().optional(),
+	enableInternalTransfer: z.boolean().optional(),
+	permitsUniversalTransfer: z.boolean().optional(),
 	enableSpotAndMarginTrading: z.boolean().optional(),
 	enableFutures: z.boolean().optional(),
 });
@@ -18,6 +20,8 @@ const AccountFlags = z.object({ canTrade: z.boolean() });
  * Live: the key's own permissions (`/sapi/v1/account/apiRestrictions`,
  * mapping in architecture §5). A missing `enableWithdrawals` counts as
  * granted, so `keys add` refuses the key rather than guessing (hard rule 2).
+ * Transfers (master↔sub, universal) count like withdrawals: a missing transfer
+ * flag counts as granted too, and Demo reports `canTransfer: false`.
  *
  * Demo serves no `/sapi` (404), so its report comes from the spot account and
  * the futures account configuration: a successful signed read proves
@@ -37,6 +41,9 @@ export async function verifyCredential(
 			canTradeSpot: r.enableSpotAndMarginTrading ?? false,
 			canTradeDerivs: r.enableFutures ?? false,
 			canWithdraw: r.enableWithdrawals ?? true,
+			canTransfer:
+				(r.enableInternalTransfer ?? true) ||
+				(r.permitsUniversalTransfer ?? true),
 			ipRestricted: r.ipRestrict ?? false,
 		};
 	}
@@ -49,6 +56,7 @@ export async function verifyCredential(
 		canTradeSpot: spot.canTrade,
 		canTradeDerivs: futures.canTrade,
 		canWithdraw: false,
+		canTransfer: false,
 		ipRestricted: false,
 	};
 }
