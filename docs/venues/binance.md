@@ -56,6 +56,12 @@ endpoint paths, weights and doc links only — tradedeck does not depend on it).
   and futures read then answers `200`. An earlier attempt answered `400 -1022` ("Signature for this
   request is not valid.") on every signed read; the adapter's signatures verify against the
   process's own public key, so `[INFERENCE]` that key was registered from another keypair.
+- **Transfer permissions are refused (decided 2026-11-01, #10):** `keys add` refuses a key with
+  `enableInternalTransfer` (master ↔ sub-account) or `permitsUniversalTransfer` like one with
+  withdrawals, and a missing flag counts as granted (`canTransfer`, `docs/architecture.md` §5;
+  `docs/decisions.md`, 2026-11-01). Whether either can move funds out of the owner's control was
+  not researched; the refusal does not depend on it. The Demo key form offers no transfer
+  permission, so Demo reports `canTransfer: false`.
 - **Key expiry:** unverified — see Unverified.
 
 ## Signing
@@ -375,7 +381,8 @@ Adapter tests replay Binance Demo responses from `packages/binance/__recordings_
 and Demo user-data events from `packages/binance/__recordings__/demo/streams/`.
 
 - **Recorder:** `bun run record:binance` (`apps/cli/src/record/`), owner-run, Demo only.
-  - Ed25519 (default): it generates the keypair in memory and prints the public-key PEM unframed,
+  - Ed25519 (default): it generates the keypair in memory with `generateEd25519KeyPair()`
+    (`apps/cli/src/ed25519.ts`, shared with `keys add`) and prints the public-key PEM unframed,
     ready to paste into Demo "Self-generated". HMAC is the alternative.
   - The API key (and HMAC secret) come from hidden prompts; nothing is written but the recordings.
   - It sends exactly the adapter's endpoint table (`packages/binance/src/endpoints.ts`): scenario
@@ -461,8 +468,6 @@ Carried from research; each item names where it gets settled.
 - **`testnet.binancefuture.com`:** still referenced by the futures WS API doc and the SDK README;
   whether it accepts traffic is unknown. Not used — Demo is authoritative.
 - **Spot `REQUEST_WEIGHT` per minute:** read from `/api/v3/exchangeInfo` at runtime.
-- **`enableInternalTransfer` / `permitsUniversalTransfer`:** whether either lets funds leave the
-  owner's accounts; M1 issue 9 decides whether they are refused like withdrawals.
 - **Commission endpoint response fields** (spot and futures) — M2.
 - **`symbolStatus=TRADING` on live spot `exchangeInfo`:** documented and verified on Demo only;
   live is never called from development.

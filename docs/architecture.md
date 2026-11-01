@@ -240,6 +240,7 @@ interface CredentialReport {
   canTradeSpot: boolean;
   canTradeDerivs: boolean;
   canWithdraw: boolean;
+  canTransfer: boolean;
   ipRestricted: boolean;
 }
 
@@ -303,12 +304,15 @@ Binance values:
 
 Binance `verifyCredential()` on `live` reads `GET /sapi/v1/account/apiRestrictions` and maps
 `enableReading` → `canRead`, `enableSpotAndMarginTrading` → `canTradeSpot`, `enableFutures` →
-`canTradeDerivs`, `enableWithdrawals` → `canWithdraw`, `ipRestrict` → `ipRestricted`. Every field
-is optional in Binance's own types: a missing `enableWithdrawals` counts as `true`, so `keys add`
-refuses the key, and any other missing flag counts as `false`. Demo serves no `/sapi` (404), so
-on `demo` the report comes from `GET /api/v3/account` and `GET /fapi/v1/accountConfig`, with
-`canWithdraw: false`: their `canWithdraw` is an account flag, and Demo keys have no withdrawal
-permission (`docs/venues/binance.md`, Keys & permissions; `docs/decisions.md`, 2026-10-24).
+`canTradeDerivs`, `enableWithdrawals` → `canWithdraw`, `enableInternalTransfer ||
+permitsUniversalTransfer` → `canTransfer`, `ipRestrict` → `ipRestricted`. Every field is optional
+in Binance's own types: a missing `enableWithdrawals`, `enableInternalTransfer` or
+`permitsUniversalTransfer` counts as `true`, so `keys add` refuses the key, and any other missing
+flag counts as `false`. Demo serves no `/sapi` (404), so on `demo` the report comes from
+`GET /api/v3/account` and `GET /fapi/v1/accountConfig`, with `canWithdraw: false` and
+`canTransfer: false`: their `canWithdraw` is an account flag, and Demo keys have no withdrawal or
+transfer permission (`docs/venues/binance.md`, Keys & permissions; `docs/decisions.md`,
+2026-10-24 and 2026-11-01).
 
 The terminal composes what a venue lacks from the capability flags — e.g. close-all as one
 reduce-only order per position, cancel-all as one call per symbol — instead of each adapter
@@ -495,23 +499,30 @@ interface SecretStore {
 - Only `apps/server` and `apps/cli` construct a `SecretStore`. Credentials are never logged,
   persisted elsewhere, or sent to the browser.
 
-Onboarding (M1 issue 9):
+Onboarding (M1 issue 9, `apps/cli/src/keys.ts`):
 
 ```
 bun run cli -- keys add --venue binance --env live|demo --label <label> [--kind hmac]
 ```
 
-1. Default `ed25519`: the CLI generates the keypair in memory and prints only the **public** key
+1. A label already in use is refused before anything else, so no venue key is created in vain.
+2. Default `ed25519`: the CLI generates the keypair in memory and prints only the **public** key
    PEM, to paste into Binance's "Self-generated" API-key form. It then reads the API key from a
    hidden prompt. The private key never touches disk or the clipboard.
-2. `--kind hmac`: reads API key and secret from hidden prompts.
-3. Runs `verifyCredential()` and prints the report.
-4. Refuses when `canWithdraw` is true — nothing is stored.
-5. Writes the `accounts` row and stores the credential; if either write fails, the other is
-   rolled back.
+3. `--kind hmac`: reads API key and secret from hidden prompts.
+4. Runs `verifyCredential()` and prints the report.
+5. Refuses when `canWithdraw` or `canTransfer` is true — nothing is stored. The other flags are
+   informational.
+6. Writes the `accounts` row first and the keychain entry second; if the keychain write fails, the
+   row is deleted again (`docs/decisions.md`, 2026-11-01).
+
+A failed check or keychain write prints the error's message with the credential's values (and each
+PEM body line) cut out, since a venue or the keychain may echo what it was given.
 
 `keys list` prints label, venue, environment, credential kind and creation time — never key
-material. `keys remove <label>` deletes the keychain entry and the account (its `fills` cascade).
+material. `keys remove <label>` asks for the label to be typed, then deletes the keychain entry
+first and the account second (its `fills` cascade). A missing keychain entry is not an error; a
+failed keychain delete keeps the account, so the command can be retried.
 
 Permissions per milestone: M1 "Enable Reading" only; M2 Demo keys add trading; M3 live keys add
 "Enable Spot & Margin Trading" / "Enable Futures". An IP whitelist is recommended whenever the user

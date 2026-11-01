@@ -317,3 +317,26 @@ error can quote part of the stored value.
 - A new credential kind becomes storable as soon as core's schema has it.
 - A corrupt entry is repaired with `keys remove` + `keys add` (#10).
 - Tests, including on the Linux CI runner, never touch `Bun.secrets`.
+
+## 2026-11-01 — keys add refuses transfer permission; account row before keychain entry
+
+**Context:** M1 issue 9 (#10) adds `keys add`. Binance reports two transfer permissions besides
+withdrawals, `enableInternalTransfer` (master ↔ sub-account) and `permitsUniversalTransfer`;
+whether either should block a key was open (`docs/venues/binance.md`, Unverified). `keys add` also
+writes to two stores, SQLite and the OS keychain, that share no transaction.
+
+**Decision:**
+- Transfer permission is refused like withdrawal permission. `CredentialReport` gains
+  `canTransfer`; on live it is `enableInternalTransfer || permitsUniversalTransfer`, and a missing
+  flag counts as granted. Demo reports `canTransfer: false`: the Demo key form has no transfer
+  permission.
+- `keys add` refuses a taken label before generating a key, writes the `accounts` row first and
+  the keychain entry second, and deletes the row again if the keychain write fails.
+- `keys remove` deletes the keychain entry first and the row second; a missing entry is not an
+  error.
+
+**Consequences:**
+- A live key needs both transfer boxes unticked. Demo keys are unaffected.
+- If the rollback itself fails, an orphan row without a keychain entry remains; `keys remove`
+  clears it.
+- A failed keychain delete leaves the account in place, so `keys remove` can be retried.

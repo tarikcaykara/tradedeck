@@ -13,6 +13,7 @@
 		"check": "biome check .",
 		"typecheck": "tsc --noEmit",
 		"test": "bun test",
+		"cli": "bun apps/cli/src/index.ts",
 		"record:binance": "bun apps/cli/src/record/binance.ts",
 		"record:binance-streams": "bun apps/cli/src/record/binance-streams.ts",
 		"db:generate": "bun run --cwd packages/db db:generate"

@@ -25,7 +25,7 @@ signals or scheduled orders are part of any planned milestone (M0–M4).
 1. Credentials exist only in `apps/server` / `apps/cli` process memory and the OS keychain via
    `@tradedeck/secrets`. Never in SQLite, logs, `.env`, the browser, `__recordings__/`, issues,
    or chat. Keys are entered only through the CLI hidden prompt.
-2. A credential whose venue reports withdrawal permission is refused at `keys add`.
+2. A credential whose venue reports withdrawal or transfer permission is refused at `keys add`.
 3. `apps/server` binds `127.0.0.1` only and rejects any request whose `Host` or `Origin` is not on
    the loopback allowlist (`docs/architecture.md` §Process model).
 4. Prices, quantities and money are decimal strings at every boundary and `decimal.js` inside;
@@ -102,8 +102,8 @@ a credential or talks to a venue. Each later venue is its own package (`packages
 
 ## Commands
 
-`check`, `typecheck` and `test` exist since M1 issue 1 (#2) and `db:generate` since #4; `cli` lands
-with #10 and `dev` with #12, together with the code they run.
+`check`, `typecheck` and `test` exist since M1 issue 1 (#2), `db:generate` since #4 and `cli` since
+#10; `dev` lands with #12, together with the code it runs.
 
 ```bash
 bun install
