@@ -516,6 +516,9 @@ bun run cli -- keys add --venue binance --env live|demo --label <label> [--kind 
 6. Writes the `accounts` row first and the keychain entry second; if the keychain write fails, the
    row is deleted again (`docs/decisions.md`, 2026-11-01).
 
+A failed check or keychain write prints the error's message with the credential's values (and each
+PEM body line) cut out, since a venue or the keychain may echo what it was given.
+
 `keys list` prints label, venue, environment, credential kind and creation time — never key
 material. `keys remove <label>` asks for the label to be typed, then deletes the keychain entry
 first and the account second (its `fills` cascade). A missing keychain entry is not an error; a

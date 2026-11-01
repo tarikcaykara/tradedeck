@@ -44,6 +44,30 @@ function message(e: unknown): string {
 	return e instanceof Error ? e.message : String(e);
 }
 
+/**
+ * The error's message with every credential value cut out: a venue or the
+ * keychain may echo what it was given (hard rule 1). PEM body lines are cut one
+ * by one too, since an error may quote the key JSON-escaped.
+ */
+function redactedMessage(e: unknown, credential: Credential): string {
+	const values =
+		credential.kind === "hmac"
+			? [credential.apiKey, credential.secret]
+			: [
+					credential.apiKey,
+					credential.privateKeyPem,
+					...credential.privateKeyPem
+						.split("\n")
+						.filter((line) => !line.startsWith("-----")),
+				];
+	let text = message(e);
+	for (const value of values) {
+		// replaceAll("") would insert the marker between every character.
+		if (value !== "") text = text.replaceAll(value, "[redacted]");
+	}
+	return text;
+}
+
 const SITES: Record<Environment, string> = {
 	live: "binance.com",
 	demo: "demo.binance.com",
@@ -121,8 +145,9 @@ export async function keysAdd(
 			credential,
 		);
 	} catch (e) {
-		// A VenueError message carries no query, headers or key.
-		io.error(`Credential check failed; nothing was stored: ${message(e)}`);
+		io.error(
+			`Credential check failed; nothing was stored: ${redactedMessage(e, credential)}`,
+		);
 		return 1;
 	}
 	io.print(formatReport(report));
@@ -159,7 +184,7 @@ export async function keysAdd(
 		// A throw here propagates; `keys remove` clears the orphan row.
 		deleteAccount(db, id);
 		io.error(
-			`Could not store the key in the keychain; the account was not added: ${message(e)}`,
+			`Could not store the key in the keychain; the account was not added: ${redactedMessage(e, credential)}`,
 		);
 		return 1;
 	}

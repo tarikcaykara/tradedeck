@@ -106,13 +106,16 @@ function fakeIo(answers: readonly string[] = []) {
 	return { io, out, queue };
 }
 
-/** In-memory stand-in with `Bun.secrets` semantics, keyed `${service}/${name}`. */
+/**
+ * In-memory stand-in with `Bun.secrets` semantics, keyed `${service}/${name}`.
+ * A failing `set` echoes the value it was given: the worst case for output.
+ */
 function fakeKeychain(fail: { set?: boolean; delete?: boolean } = {}) {
 	const entries = new Map<string, string>();
 	const backend: KeychainBackend = {
 		get: async ({ service, name }) => entries.get(`${service}/${name}`) ?? null,
 		set: async ({ service, name, value }) => {
-			if (fail.set) throw new Error("keychain locked");
+			if (fail.set) throw new Error(`keychain locked; not stored: ${value}`);
 			entries.set(`${service}/${name}`, value);
 		},
 		delete: async ({ service, name }) => {
@@ -141,6 +144,7 @@ function setup(opts: Setup = {}) {
 		verifyCredential: async (...args) => {
 			verified.push(args);
 			if (opts.verifyFails) {
+				// Echoes the API key: the worst case for output.
 				throw new VenueError({
 					kind: "http",
 					method: "GET",
@@ -148,7 +152,7 @@ function setup(opts: Setup = {}) {
 					status: 401,
 					code: "-2015",
 					retryAfterMs: null,
-					text: "Invalid API-key, IP, or permissions for action.",
+					text: `Invalid API-key ${args[1].apiKey}, IP, or permissions for action.`,
 				});
 			}
 			return { ...READ_ONLY_REPORT, ...opts.report };
@@ -245,9 +249,18 @@ describe("output never shows key material", () => {
 			"hmac",
 			{ answers: [API_KEY, HMAC_SECRET], report: { canWithdraw: true } },
 		],
-		["failed check", "ed25519", { answers: [API_KEY], verifyFails: true }],
 		[
-			"keychain failure",
+			"failed check echoing the API key",
+			"ed25519",
+			{ answers: [API_KEY], verifyFails: true },
+		],
+		[
+			"keychain failure echoing the stored ed25519 key",
+			"ed25519",
+			{ answers: [API_KEY], keychainFails: { set: true } },
+		],
+		[
+			"keychain failure echoing the stored hmac key",
 			"hmac",
 			{ answers: [API_KEY, HMAC_SECRET], keychainFails: { set: true } },
 		],
