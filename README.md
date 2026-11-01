@@ -5,17 +5,17 @@ positions and trade from one screen. Binance first; more CEXes and perp DEXes be
 adapter interface.
 
 **Status:** M1 in progress — workspace, tooling, the core domain model, the venue adapter
-interface with its signed REST and WebSocket transport, and the Binance adapter (instruments,
-credential check, account snapshot, private user-data streams with resync); nothing user-facing
-runs yet.
+interface with its signed REST and WebSocket transport, the Binance adapter (instruments,
+credential check, account snapshot, private user-data streams with resync), and the keys CLI
+(`bun run cli -- keys add|list|remove`); the terminal itself does not run yet.
 
 ## Safety model
 
 - **Keys stay local.** API keys live only in the local server process and the OS keychain. They
   are entered through a CLI hidden prompt — never through the browser — and are never written to
   the database, logs or files.
-- **Withdraw-enabled keys are refused.** A key whose exchange reports withdrawal permission is
-  rejected when it is added.
+- **Withdraw- or transfer-enabled keys are refused.** A key whose exchange reports withdrawal or
+  transfer permission is rejected when it is added.
 - **Demo first.** Trading ships against Binance Demo before any real-money account can place an
   order.
 - **Live trading is opt-in per account.** It is enabled only from the CLI, per account, with a
