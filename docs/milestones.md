@@ -14,21 +14,34 @@ code. Issues live under the matching GitHub milestone; the owner picks the next 
 
 ## M1 — Read-only monitor (Binance)
 
-Thirteen issues, in dependency order:
+Thirteen issues, in dependency order. "M1 issue N" elsewhere in the repo means item N of this
+list; the GitHub issue number follows each item.
 
-1. Workspace scaffold, tooling and CI.
-2. Core: domain types, decimal rules and UI protocol.
-3. DB: SQLite + Drizzle — accounts and fills.
-4. Adapter: `ExchangeAdapter` read interface and transport.
-5. Secrets: keychain-backed `SecretStore`.
-6. Binance: instruments, credential check and REST snapshot.
-7. Binance: private user-data streams with resync.
-8. Binance: public price streams for held instruments.
-9. CLI: `keys add | list | remove`.
-10. Server: account sessions, state store, REST + WS on loopback.
-11. Web: shell, accounts bar, spot holdings, futures positions, open orders.
-12. Binance: spot fills ledger and average cost.
-13. CLI: `doctor`.
+1. Workspace scaffold, tooling and CI (#2).
+2. Core: domain types, decimal rules and UI protocol (#3).
+3. DB: SQLite + Drizzle — accounts and fills (#4).
+4. Adapter: `ExchangeAdapter` read interface and transport (#5).
+5. Secrets: keychain-backed `SecretStore` (#6).
+6. Binance: instruments, credential check and REST snapshot (#7).
+7. Binance: private user-data streams with resync (#8).
+8. Binance: public price streams for held instruments (#9).
+9. CLI: `keys add | list | remove` (#10).
+10. Server: account sessions, state store, REST + WS on loopback (#11).
+11. Web: shell, accounts bar, spot holdings, futures positions, open orders (#12).
+12. Binance: spot fills ledger and average cost (#13).
+13. CLI: `doctor` (#14).
+
+Work order for the open issues, unless the owner picks another unblocked one:
+**#10 → #14 → #9 → #11 → #12 → #13**. Each issue's open blockers are also set as GitHub issue
+dependencies ("blocked by").
+
+- #10 first: the server (#11) loads accounts from the DB and the `SecretStore`, and only
+  `keys add` creates them. The design rounds that run with #11 need a Demo account's real state.
+- #14 next: it needs only #8 and #10, reuses the CLI pieces #10 adds (`SecretStore`,
+  `verifyCredential()`, account rows), and gives a one-line-per-check report on keychain, clock
+  and stream problems before server work begins.
+- #9 before #11, #11 before #12: hard dependencies.
+- #13 last: a holding the ledger does not cover must show "—" in #12's holdings table.
 
 **Done when**, with one live read-only key and one Demo key added via the CLI, the dashboard shows
 for both accounts: spot balances (value in USDT, average cost where the ledger covers the holding,
