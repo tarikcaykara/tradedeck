@@ -230,8 +230,8 @@ export function createPriceFeed(deps: PriceFeedDeps): PriceFeed {
 		subscribe(instrumentIds, onPrice) {
 			const ids = [...new Set(instrumentIds)];
 			const markets = new Set(ids.map((id) => route(id).market));
-			// Checked before anything is registered: past the limit Binance would
-			// accept the SUBSCRIBE and never deliver the excess.
+			// Checked before anything is registered, so a refused call leaves
+			// every existing subscription as it was.
 			for (const market of markets) {
 				const streams = wanted(market);
 				for (const id of ids) {
