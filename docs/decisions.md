@@ -456,3 +456,31 @@ by itself.
 - A key added before a permission change on the venue is caught on the next `doctor` run.
 - Switching to an older checkout after a migration is reported instead of silently running on a
   newer schema.
+
+## 2026-11-03 — `bun audit` in the gate; advisories allowlisted by id, each with a reason
+
+**Context:** GitHub's dependency graph does not read `bun.lock`: the SBOM lists only the 14
+manifest dependencies, so Dependabot alerts miss transitive packages (#39). `bun audit` reads the
+lockfile; on 2026-11-03 it reports one advisory, GHSA-67mh-4wv8-2f99 (moderate): esbuild ≤ 0.24.2's
+development server (`serve`) lets any website read its responses. #11 and #12 bring Hono, React,
+Vite, Tailwind and shadcn, with hundreds of transitive packages.
+
+**Decision:**
+- The `gate` job ends with `bun run audit`. It is the last step, so neither a registry outage nor
+  a new advisory hides lint, type or test results.
+- There is no severity threshold: `--audit-level=high` would also pass a moderate advisory in a
+  runtime dependency such as `zod` or `decimal.js`. Every advisory is triaged instead (`CLAUDE.md`,
+  Workflow): fix it, or ignore it by id with an entry here.
+- GHSA-67mh-4wv8-2f99 is ignored:
+  - The vulnerable esbuild 0.18.20 comes from `drizzle-kit` 0.31.11 → `@esbuild-kit/esm-loader` →
+    `@esbuild-kit/core-utils`, which pins `esbuild ~0.18.20`, so `bun audit fix` cannot move it.
+  - `drizzle-kit` is a devDependency of `packages/db`, run only by `bun run db:generate`, and
+    `core-utils` calls only esbuild's `transform` / `transformSync`, never `serve`.
+  - Drop the ignore once `drizzle-kit` no longer pulls in esbuild < 0.25.
+
+**Consequences:**
+- A newly published advisory turns every open PR, and the next `master` run, red until it is
+  triaged.
+- `bun audit` needs the npm registry; an outage fails the gate's last step.
+- A stale ignore is not detected automatically; the Dependabot review of the package behind it
+  checks (`CLAUDE.md`, Workflow).
