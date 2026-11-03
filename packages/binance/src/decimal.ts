@@ -14,11 +14,15 @@ const plain = (d: Decimal): string => (d.isZero() ? "0" : d.toFixed());
 /**
  * A venue decimal string. Plain decimals pass unchanged; exponent notation
  * (`1E-8`) becomes plain notation, because core decimals have no exponent
- * (decision 2026-10-22); anything else is a decode error.
+ * (decision 2026-10-22). Anything else, or a value past core's digit bounds
+ * in either notation, is a decode error.
  */
 export const venueDecimal = z.string().transform((s, ctx) => {
 	if (DecimalStringSchema.safeParse(s).success) return s;
-	if (EXPONENT.test(s)) return plain(new D(s));
+	if (EXPONENT.test(s)) {
+		const p = plain(new D(s));
+		if (DecimalStringSchema.safeParse(p).success) return p;
+	}
 	ctx.addIssue({ code: "custom", message: "not a decimal string" });
 	return z.NEVER;
 });

@@ -60,7 +60,7 @@ export function roundQty(rule: QtyRule, qty: string): string {
 	return formatDecimal(q.toNearest(s, Decimal.ROUND_DOWN));
 }
 
-/** `qty × price`, unrounded: exact up to 64 significant digits. */
+/** `qty × price`, unrounded and exact (decimal.ts bounds the inputs). */
 export function notional(qty: string, price: string): string {
 	return formatDecimal(
 		parseDecimal("qty", qty).times(parseDecimal("price", price)),

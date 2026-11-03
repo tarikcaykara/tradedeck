@@ -18,12 +18,21 @@ describe("venueDecimal", () => {
 		expect(venueDecimal.parse(input)).toBe(output);
 	});
 
-	test.each(["", "abc", ".5", "5.", "+1", "NaN", "Infinity", "0x10"])(
-		"rejects %p",
-		(input) => {
-			expect(venueDecimal.safeParse(input).success).toBe(false);
-		},
-	);
+	test.each([
+		"",
+		"abc",
+		".5",
+		"5.",
+		"+1",
+		"NaN",
+		"Infinity",
+		"0x10",
+		// Plain notation past core's digit bounds, from exponent notation too.
+		"1E-21",
+		"1E+20",
+	])("rejects %p", (input) => {
+		expect(venueDecimal.safeParse(input).success).toBe(false);
+	});
 });
 
 describe("arithmetic", () => {
