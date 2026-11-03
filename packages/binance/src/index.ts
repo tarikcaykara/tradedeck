@@ -1,4 +1,10 @@
 export { type BinanceAdapter, createBinanceAdapter } from "./adapter.ts";
+export { verifyCredential } from "./credential.ts";
+export {
+	measureClockOffset,
+	probeUserStream,
+	withinRecvWindow,
+} from "./doctor.ts";
 export { ENDPOINTS, type Endpoint, type EndpointName } from "./endpoints.ts";
 export {
 	API_KEY_HEADER,

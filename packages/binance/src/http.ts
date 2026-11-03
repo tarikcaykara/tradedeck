@@ -31,7 +31,7 @@ export interface BinanceHttp {
 	invalidateClock(host: Host): void;
 }
 
-const ServerTime = z.object({ serverTime: z.number().int() });
+export const ServerTime = z.object({ serverTime: z.number().int() });
 
 /** Binance: "Timestamp for this request is outside of the recvWindow." */
 const TIMESTAMP_OUTSIDE_RECV_WINDOW = "-1021";
