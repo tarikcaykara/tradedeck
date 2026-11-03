@@ -513,3 +513,33 @@ go. Spot drops a connection that sends more than 5 messages per second, pings an
 - A Binance 24 h cut costs about a second of prices; nothing is resynced.
 - A subscription to a symbol Binance does not stream is accepted and stays silent; prices of a
   delisted instrument simply stop.
+
+## 2026-11-03 — Core value constraints: bounded decimal strings, signs, instrument ids
+
+**Context:** The 2026-11-01 audit (#38) found three gaps in core's schemas:
+- prices, quantities, ticks, steps and minimums accepted negative values;
+- an `Instrument`'s `id` was not checked against its venue, kind and symbol;
+- `decimal.js` at 64 significant digits silently rounded longer results. `(mark − entry) × size`
+  at 20 + 20 digits lost its fractional tail.
+
+**Decision:**
+- Supersedes the 2026-10-22 decimal-string pattern and precision. A decimal string has at most 20
+  integer and 20 fraction digits, leading and trailing zeros aside, enforced by `DECIMAL_STRING`
+  and therefore at every boundary. The precision is derived from the bounds:
+  `2 × (20 + 20) + 2 = 82`. A difference of two inputs (41 digits) times a third (40) fits, so
+  core's `plus`, `minus` and single `times` are exact. A longer value is rejected rather than
+  rounded; an adapter's exponent-notation conversion is checked against the same bounds.
+- Prices and quantities are non-negative (`NonNegativeDecimalSchema`; `"-0"` counts as zero).
+  Zero stays legal where it means something: a closed position's size, a close-position order's
+  qty, "no minimum".
+- Ticks, steps, market steps, and prices whose absence is `null` (liquidation, order price and
+  trigger) are positive (`PositiveDecimalSchema`).
+- Balances, PnL and fees stay signed: in Binance's multi-assets mode a futures balance can go
+  negative, and a fee can be a rebate.
+- `InstrumentSchema` requires `id === venue:kind:symbol`.
+
+**Consequences:**
+- A venue value past the bounds is a `decode` error that takes the account `down`, never a quietly
+  rounded number. The bounds cover any real price or size: 20 fraction digits exceed wei's 18.
+- Division (average cost, #13) still has to round explicitly; the precision covers only the
+  operations above.
