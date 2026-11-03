@@ -331,8 +331,9 @@ venue: base URLs, the API-key header and the server-time endpoint come from the 
   no body. A `signed` request appends `recvWindow` (default 5000) and `timestamp` from the server
   clock, signs that exact query and appends the percent-encoded `signature`; an `apiKey` request
   sends only the key header. `fetch` is injectable. Each request times out after 10 s by default,
-  response body included. The parsed JSON is returned as `unknown`; Zod validation belongs to the
-  venue package.
+  response body included. Redirects are refused (`redirect: "error"`, a `network` error): a
+  redirect would carry the API-key header to another origin. The parsed JSON is returned as
+  `unknown`; Zod validation belongs to the venue package.
 - **`VenueError`**: `kind` (`http` | `network` | `timeout` | `decode`), `method`, the bare `path`,
   `status`, the venue `code` as a string and `retryAfterMs` (from `Retry-After` on 429/418). Neither
   the message nor any field carries the query, headers, API key or signature: a `network` error
@@ -349,7 +350,10 @@ venue: base URLs, the API-key header and the server-time endpoint come from the 
   again before every connect (a fresh listen key); statuses `connecting` / `open` / `closed` with
   `retryInMs`. The delay uses equal jitter: `cap = min(maxDelay, initialDelay × 2^attempt)`, delay
   uniform in `[cap/2, cap]` (defaults 1 s and 30 s). The backoff resets only after a connection
-  stayed open `stableAfterMs` (default 30 s): a private stream may be silent for long.
+  stayed open `stableAfterMs` (default 30 s): a private stream may be silent for long. A rejected
+  `url()` or a throwing constructor is a failed attempt (`code` null); a throwing constructor's
+  reason is the fixed `WebSocket constructor failed`, since its message can quote the URL and the
+  listen key in it.
   - **Heartbeat:** every `heartbeatMs` (default 15 s) while open, the socket is terminated if
     nothing arrived since the previous tick (a message, ping or pong), else it sends a ping. A
     silently dead connection is dropped within two intervals and then reconnects like any other
@@ -357,7 +361,8 @@ venue: base URLs, the API-key header and the server-time endpoint come from the 
   - **`reconnect()`** terminates the open connection (reason `reconnect`); the usual backoff
     connects again. The venue package uses it for a refused subscription, an expired listen key,
     a server shutdown notice and the daily rotation.
-  - `close()` is final.
+  - `close()` is final, also when called from `onStatus`: no URL is resolved and no retry is armed
+    after it.
 
 ## 6. Streaming & state
 
@@ -505,6 +510,11 @@ Onboarding (M1 issue 9, `apps/cli/src/keys.ts`):
 bun run cli -- keys add --venue binance --env live|demo --label <label> [--kind hmac]
 ```
 
+`--label` is 1–64 letters, digits, `.`, `_` or `-`; `keys remove` takes any stored label, so one
+saved before this rule stays removable. `keys add` and `keys remove` prompt, so they need a
+terminal: with a non-TTY stdin they exit 1 before the database or the keychain is opened, since a
+prompt at EOF would never settle. `keys list` runs anywhere.
+
 1. A label already in use is refused before anything else, so no venue key is created in vain.
 2. Default `ed25519`: the CLI generates the keypair in memory and prints only the **public** key
    PEM, to paste into Binance's "Self-generated" API-key form. It then reads the API key from a
@@ -579,7 +589,10 @@ Per package:
   and `timers`), so keepalive, rotation and reconnect timing are tested without waiting; the fake
   answers pings at once, so the clock can jump hours without a heartbeat timeout. One test per
   venue runs the subscription against a local `Bun.serve({ websocket })` server. Recorded Demo
-  user-data events (`__recordings__/demo/streams/`) replay through the same fake sockets.
+  user-data events (`__recordings__/demo/streams/`) replay through the same fake sockets. The
+  recordings guard fails when the scan finds no REST or no stream recording, and on any string
+  value holding 64 letters and digits in a row — the shape of a Binance API key, secret or listen
+  key — under any field name; it reports only the path, never the value.
 - Live smoke runs only against Binance Demo, manually. Development and CI never call live venue
   endpoints.
 - `test/workspace.test.ts` enforces the import graph of §2.

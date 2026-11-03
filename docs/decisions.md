@@ -396,3 +396,33 @@ Rulesets are free for public repositories.
 - When `master` moves, an open PR must be updated before it can merge; Dependabot rebases its own.
 - A new dependency on the money, keys or ledger path must be added to `money-keys` in both
   `.github/dependabot.yml` and `CLAUDE.md`.
+
+## 2026-11-03 — Audit hardening: `-1021` resends only a GET, redirects refused, inputs validated
+
+**Context:** The 2026-11-01 audit (#36) found no critical or high finding, but several cheap gaps in
+code that #14, #9 and #11 build on. The 2026-10-23 rule "`-1021` resyncs the server clock and
+retries the request exactly once" covered every signed endpoint; M2 adds signed order endpoints,
+and a resent order bypasses the OrderRouter (hard rule 5).
+
+**Decision:**
+- Supersedes the 2026-10-23 `-1021` bullet: a signed `-1021` always resyncs the server clock, but
+  only a `GET` is resent, once. Any other method rejects with the `-1021` error; the next signed
+  request uses the fresh offset.
+- The REST client refuses every redirect (`redirect: "error"`), whatever the auth mode: a
+  redirect would carry the API-key header to another origin, and no Binance endpoint redirects.
+- A futures listen key must match `/^[A-Za-z0-9]{1,256}$/` before it enters a URL. A throwing
+  `WebSocket` constructor gets the fixed reason `WebSocket constructor failed`, since its message
+  can quote the URL.
+- `ReconnectingSocket` rechecks `closed` after each `onStatus`, so a `close()` from the callback
+  arms no retry and resolves no URL.
+- The recordings guard fails on an empty scan and on any 64-character letters-and-digits string,
+  reporting paths only.
+- `keys add` and `keys remove` refuse a non-TTY stdin; `keys add` accepts labels matching
+  `/^[A-Za-z0-9._-]{1,64}$/`. `keys remove` does not check the pattern, so an older label stays
+  removable.
+
+**Consequences:**
+- An M2 order that meets `-1021` fails visibly; the OrderRouter decides what happens next.
+- A venue that ever redirects an API call fails with `network: fetch failed (UnexpectedRedirect)`
+  until the base URL is fixed.
+- Scripting `keys add` or `keys remove` through a pipe is not possible; `keys list` still is.
