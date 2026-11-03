@@ -110,8 +110,7 @@ bun install
 bun run dev                      # server + Vite dev server
 bun run cli -- <cmd>             # keys add|list|remove, doctor
 bun run db:generate              # migration from packages/db/src/schema.ts (add --name <slug>)
-bun run check && bun run typecheck && bun test   # the gate — green before every commit
-bun run audit                    # dependency advisories (needs the npm registry); CI's gate runs it last
+bun run check && bun run typecheck && bun test && bun run audit   # the gate — green before every commit
 ```
 
 ## Workflow
