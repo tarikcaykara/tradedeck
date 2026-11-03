@@ -7,6 +7,8 @@ test.each<["long" | "short", string, string, string, string]>([
 	["short", "3000", "2950.25", "2", "99.5"],
 	["long", "100", "100", "3", "0"],
 	["long", "100", "90", "0", "0"],
+	// The schema's zero: a closed position, never a negative one.
+	["long", "100", "90", "-0", "0"],
 ])(
 	"%s entry %s, mark %s, size %s → %s",
 	(side, entryPrice, markPrice, size, result) => {
