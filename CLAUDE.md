@@ -103,11 +103,12 @@ a credential or talks to a venue. Each later venue is its own package (`packages
 ## Commands
 
 `check`, `typecheck` and `test` exist since M1 issue 1 (#2), `db:generate` since #4, `cli` since
-#10 and `audit` since #39; `dev` lands with #12, together with the code it runs.
+#10, `audit` since #39 and `server` since #11; `dev` lands with #12, together with the code it runs.
 
 ```bash
 bun install
 bun run dev                      # server + Vite dev server
+bun run server                   # apps/server on 127.0.0.1:8790
 bun run cli -- <cmd>             # keys add|list|remove, doctor
 bun run db:generate              # migration from packages/db/src/schema.ts (add --name <slug>)
 bun run check && bun run typecheck && bun test && bun run audit   # the gate — green before every commit
@@ -141,7 +142,7 @@ bun run check && bun run typecheck && bun test && bun run audit   # the gate —
   - the fills ledger: its schema, ingestion, deduplication and the coverage rule for average cost;
   - the live-trading flag (hard rule 7) or the server's loopback/Host/Origin guard (hard rule 3);
   - a Dependabot PR in the `money-keys` group (`decimal.js`, `zod`, `drizzle-orm`,
-    `@clack/prompts`) or any major version update;
+    `@clack/prompts`, `hono`, `@hono/bun`) or any major version update;
   - the hard rules or this list.
 
   Such a PR's body opens with `Owner review: <item>`. Claude stops once CI is green and the review

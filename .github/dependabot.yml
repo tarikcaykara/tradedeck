@@ -17,11 +17,27 @@ updates:
       include: scope
     groups:
       money-keys:
-        patterns: ["decimal.js", "zod", "drizzle-orm", "@clack/prompts"]
+        patterns:
+          [
+            "decimal.js",
+            "zod",
+            "drizzle-orm",
+            "@clack/prompts",
+            "hono",
+            "@hono/bun",
+          ]
         update-types: [minor, patch]
       other:
         patterns: ["*"]
-        exclude-patterns: ["decimal.js", "zod", "drizzle-orm", "@clack/prompts"]
+        exclude-patterns:
+          [
+            "decimal.js",
+            "zod",
+            "drizzle-orm",
+            "@clack/prompts",
+            "hono",
+            "@hono/bun",
+          ]
         update-types: [minor, patch]
     ignore:
       - dependency-name: "@types/bun"

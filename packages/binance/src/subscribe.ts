@@ -129,7 +129,11 @@ export function subscribeAccount(
 	const createdAt = new Map<string, number>();
 	/** Position re-reads in flight per symbol; `again` repeats one once it lands. */
 	const reads = new Map<string, { again: boolean; eventE: number }>();
-	let balanceRead: { again: boolean; assets: Set<string> } | null = null;
+	let balanceRead: {
+		again: boolean;
+		eventE: number;
+		assets: Set<string>;
+	} | null = null;
 
 	const positionKey = (p: Position) => `${p.instrumentId}|${p.positionSide}`;
 
@@ -222,7 +226,7 @@ export function subscribeAccount(
 			}
 			case "spotBalances":
 				for (const row of event.rows) {
-					handlers.onBalance(spotBalanceOf(accountId, row));
+					handlers.onBalance(spotBalanceOf(accountId, row, event.u));
 				}
 				return;
 			case "futuresOrder": {
@@ -256,7 +260,7 @@ export function subscribeAccount(
 			}
 			case "accountUpdate":
 				for (const symbol of event.symbols) readPosition(symbol, event.E);
-				if (event.assets.length > 0) readBalances(event.assets);
+				if (event.assets.length > 0) readBalances(event.assets, event.E);
 				return;
 			case "leverage": {
 				const prefix = `binance:linear:${event.symbol}|`;
@@ -328,23 +332,25 @@ export function subscribeAccount(
 		}
 	}
 
-	function readBalances(assets: string[]): void {
+	function readBalances(assets: string[], eventE: number): void {
 		if (balanceRead !== null) {
 			balanceRead.again = true;
+			balanceRead.eventE = Math.max(balanceRead.eventE, eventE);
 			for (const a of assets) balanceRead.assets.add(a);
 			return;
 		}
-		const state = { again: false, assets: new Set(assets) };
+		const state = { again: false, eventE, assets: new Set(assets) };
 		balanceRead = state;
 		void rereadBalances(state, generation);
 	}
 
 	async function rereadBalances(
-		state: { again: boolean; assets: Set<string> },
+		state: { again: boolean; eventE: number; assets: Set<string> },
 		g: number,
 	): Promise<void> {
 		for (;;) {
 			const assets = [...state.assets];
+			const { eventE } = state;
 			state.assets.clear();
 			let rows: z.infer<typeof FuturesBalances>;
 			try {
@@ -359,13 +365,16 @@ export function subscribeAccount(
 			for (const asset of assets) {
 				const row = rows.find((r) => r.asset === asset);
 				handlers.onBalance(
-					(row === undefined ? null : toFuturesBalance(accountId, row)) ?? {
+					(row === undefined
+						? null
+						: toFuturesBalance(accountId, row, eventE)) ?? {
 						accountId,
 						scope: "derivs",
 						asset,
 						free: "0",
 						locked: "0",
 						total: "0",
+						updatedAt: eventE,
 					},
 				);
 			}

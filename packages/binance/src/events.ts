@@ -54,6 +54,8 @@ export type ExecutionReport = z.infer<typeof ExecutionReport>;
 
 const OutboundAccountPosition = z.object({
 	E: timestamp,
+	/** Time of the last account update: the balances' own time. */
+	u: timestamp,
 	B: z.array(z.object({ a: z.string(), f: venueDecimal, l: venueDecimal })),
 });
 export type SpotBalanceRow = z.infer<
@@ -139,7 +141,7 @@ const AccountConfigUpdate = z.object({
 /** A decoded event the subscription applies; `E` is the venue event time. */
 export type StreamEvent =
 	| { kind: "spotOrder"; E: number; report: ExecutionReport }
-	| { kind: "spotBalances"; E: number; rows: SpotBalanceRow[] }
+	| { kind: "spotBalances"; E: number; u: number; rows: SpotBalanceRow[] }
 	| { kind: "futuresOrder"; E: number; order: FuturesOrderUpdate }
 	| { kind: "algoOrder"; E: number; T: number; algo: AlgoOrderUpdate }
 	/** Positions on `symbols` and balances of `assets` changed. */
@@ -165,8 +167,8 @@ export function decodeSpotEvent(raw: unknown): StreamEvent | null {
 			return { kind: "spotOrder", E: report.E, report };
 		}
 		case "outboundAccountPosition": {
-			const { E, B } = decode(OutboundAccountPosition, raw, at);
-			return { kind: "spotBalances", E, rows: B };
+			const { E, u, B } = decode(OutboundAccountPosition, raw, at);
+			return { kind: "spotBalances", E, u, rows: B };
 		}
 		default:
 			return null;
@@ -251,8 +253,16 @@ export function spotFillOf(accountId: string, r: ExecutionReport): Fill | null {
 	};
 }
 
-/** `outboundAccountPosition` rows are absolute, not deltas. */
-export function spotBalanceOf(accountId: string, row: SpotBalanceRow): Balance {
+/**
+ * `outboundAccountPosition` rows are absolute, not deltas. `updatedAt` is the
+ * event's `u` (time of the last account update), not `E` (when the event was
+ * pushed): `u` is the time of the balance values themselves.
+ */
+export function spotBalanceOf(
+	accountId: string,
+	row: SpotBalanceRow,
+	u: number,
+): Balance {
 	return {
 		accountId,
 		scope: "spot",
@@ -260,6 +270,7 @@ export function spotBalanceOf(accountId: string, row: SpotBalanceRow): Balance {
 		free: row.f,
 		locked: row.l,
 		total: add(row.f, row.l),
+		updatedAt: u,
 	};
 }
 

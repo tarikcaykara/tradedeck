@@ -62,12 +62,15 @@ the clock as a parameter; that is what lets `apps/web` import it.
 
 ## 3. Process model
 
-- `apps/server` listens on `127.0.0.1:8790` — never `0.0.0.0`, never a LAN address.
+- `apps/server` listens on `127.0.0.1:8790` — never `0.0.0.0`, never a LAN address. `bun run
+  server` starts it (`apps/server/src/index.ts`); SIGINT/SIGTERM end every stream before it exits.
 - Development: the Vite dev server on `localhost:5173` proxies `/api` and `/ws` to the server. Both
   proxy entries set `changeOrigin: true` (so the forwarded `Host` is `127.0.0.1:8790`) and `/ws`
   sets `ws: true`. The browser's `Origin` stays `http://localhost:5173`, which the guard allows.
-- Production: `apps/web` is built once and served by `apps/server` from the same origin.
-- **Loopback guard** — middleware in front of every route, the WebSocket upgrade included:
+- Production: `apps/web` is built once and served by `apps/server` from the same origin, from
+  `apps/web/dist` whenever that build exists.
+- **Loopback guard** — middleware in front of every route, the WebSocket upgrade included, built
+  from the port the server listens on (8790; the tests use a random one):
   - `403` when `Host` ∉ {`127.0.0.1:8790`, `localhost:8790`};
   - `403` when `Origin` is present and ∉ {`http://127.0.0.1:8790`, `http://localhost:8790`,
     `http://localhost:5173`, `http://127.0.0.1:5173`}.
@@ -134,6 +137,7 @@ interface Balance {
   free: string;
   locked: string;
   total: string;
+  updatedAt: number;  // venue event time
 }
 
 interface Position {
@@ -400,6 +404,16 @@ venue: base URLs, the API-key header and the server-time endpoint come from the 
   and a reconnect resubscribes the current set (`docs/venues/binance.md`, Price streams). uPnL is
   recomputed in core from the mark stream: long `(mark − entry) × size`, short
   `(entry − mark) × size`. Spot holding value is `total × last`.
+- Server sessions (`apps/server/src/sessions.ts`), one per account:
+  - the credential comes from the keychain; a missing or unreadable entry leaves the account
+    `down` and is logged, and no adapter is built;
+  - instruments load once per environment;
+  - `subscribe()` feeds the store;
+  - price subscriptions follow the account's held set: its positions, its open orders, and
+    `<asset>USDT` for each spot balance other than USDT whose instrument is known.
+- The store (`apps/server/src/store.ts`) applies the rules above to balances, positions and orders
+  alike (each carries `updatedAt`). A balance whose total is zero is removed. Fills are only
+  forwarded; the ledger (M1 issue 12) stores them.
 - The UI shows per-account status and a "stale" badge on every row of an account whose status is
   not `live`.
 
@@ -431,6 +445,9 @@ parses what it receives with the same schemas.
     | { type: 'account_status'; accountId: string; status: AccountStatus };
   ```
 
+- On connect, `/ws` sends the snapshot, then the latest price of every instrument that has one,
+  then deltas. Every message is checked against `ServerMessageSchema` first; one that fails is
+  logged and never sent.
 - The web app keeps this state in a Zustand store with per-field selectors; it has no other data
   source in M1. Order intents (M2) are REST `POST`s whose results arrive back over `/ws`.
 
