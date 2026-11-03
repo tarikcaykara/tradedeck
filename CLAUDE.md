@@ -102,15 +102,15 @@ a credential or talks to a venue. Each later venue is its own package (`packages
 
 ## Commands
 
-`check`, `typecheck` and `test` exist since M1 issue 1 (#2), `db:generate` since #4 and `cli` since
-#10; `dev` lands with #12, together with the code it runs.
+`check`, `typecheck` and `test` exist since M1 issue 1 (#2), `db:generate` since #4, `cli` since
+#10 and `audit` since #39; `dev` lands with #12, together with the code it runs.
 
 ```bash
 bun install
 bun run dev                      # server + Vite dev server
 bun run cli -- <cmd>             # keys add|list|remove, doctor
 bun run db:generate              # migration from packages/db/src/schema.ts (add --name <slug>)
-bun run check && bun run typecheck && bun test   # the gate — green before every commit
+bun run check && bun run typecheck && bun test && bun run audit   # the gate — green before every commit
 ```
 
 ## Workflow
@@ -149,5 +149,16 @@ bun run check && bun run typecheck && bun test   # the gate — green before eve
 - Dependabot (`.github/dependabot.yml`) opens weekly update PRs. Each one gets the reviewer-agent
   pass, which reads the changelogs between the two versions, and a green `gate`. Claude merges the
   `other` and `actions` groups; the owner merges the rest (Owner-review PRs). Nothing auto-merges.
+- Dependency audit: the `gate` ends with `bun run audit`, which is `bun audit` with an allowlist
+  of advisory ids. Every severity fails, so a new advisory turns every PR red until it is triaged:
+  - fix it (`bun audit fix`, or a dependency bump through a PR);
+  - or, only when no fixed version fits the dependents' ranges and the vulnerable code is
+    unreachable in tradedeck, add `--ignore=<GHSA id>` to the `audit` script together with a
+    `docs/decisions.md` entry naming the reason and when to drop it;
+  - an advisory in a dependency that ships at runtime (not a devDependency) is never ignored
+    without the owner's approval in that PR.
+
+  A Dependabot PR that updates a package behind an ignored advisory also runs `bun audit` without
+  that `--ignore`, and drops it when the advisory is gone.
 - Conventional Commits; one logical change per commit; no `Co-Authored-By` trailers.
 - Update `README.md`, `CLAUDE.md` and `docs/` in the same PR as any behaviour change.

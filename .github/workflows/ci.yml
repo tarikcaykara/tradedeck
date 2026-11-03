@@ -29,3 +29,6 @@ jobs:
         run: bun run typecheck
       - name: Test
         run: bun test
+      # Last, so a registry outage or a new advisory never hides code results.
+      - name: Dependency audit
+        run: bun run audit
