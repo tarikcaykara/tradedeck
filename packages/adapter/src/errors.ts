@@ -1,6 +1,7 @@
 /**
  * - `http`: the venue answered with a non-2xx status.
- * - `network`: the request failed before a response arrived.
+ * - `network`: the request failed before a response arrived, or the venue
+ *   answered with a redirect (refused).
  * - `timeout`: no complete response within the request timeout. The outcome
  *   is unknown: an order request may still have reached the venue.
  * - `decode`: a 2xx response whose body is not JSON.
