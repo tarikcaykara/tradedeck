@@ -2,6 +2,11 @@ import { isCancel, log, password, text } from "@clack/prompts";
 
 /** Every line a command shows or asks goes through here, so tests capture it all. */
 export interface Io {
+	/**
+	 * False when stdin is not a TTY: a prompt could never be answered (Clack
+	 * never settles at EOF).
+	 */
+	readonly interactive: boolean;
 	/** Raw text to stdout, newline appended (PEM blocks, tables, the report). */
 	print(text: string): void;
 	step(text: string): void;
@@ -16,6 +21,7 @@ export interface Io {
 
 export function clackIo(): Io {
 	return {
+		interactive: process.stdin.isTTY === true,
 		print: (value) => {
 			process.stdout.write(`${value}\n`);
 		},

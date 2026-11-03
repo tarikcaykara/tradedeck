@@ -81,8 +81,9 @@ function parse(argv: string[]): Command | string {
 }
 
 /**
- * Returns the exit code. `deps` is called only for a valid command, so a usage
- * error opens neither the database nor the keychain.
+ * Returns the exit code. `deps` is called only for a valid command that can
+ * run here: neither a usage error nor a missing terminal opens the database or
+ * the keychain.
  */
 export async function runCli(
 	argv: string[],
@@ -93,6 +94,11 @@ export async function runCli(
 	if (typeof command === "string") {
 		io.error(command);
 		io.print(USAGE);
+		return 1;
+	}
+	// `keys list` never prompts; add and remove would wait forever.
+	if (command.name !== "list" && !io.interactive) {
+		io.error(`keys ${command.name} needs a terminal: stdin is not a TTY`);
 		return 1;
 	}
 	let d: KeysDeps | undefined;

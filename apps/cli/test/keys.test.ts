@@ -83,8 +83,11 @@ afterEach(() => {
 	rmSync(dir, { recursive: true, force: true });
 });
 
-/** Captures every line shown or asked; answers come from a queue, empty = cancel. */
-function fakeIo(answers: readonly string[] = []) {
+/**
+ * Captures every line shown or asked; answers come from a queue, empty = cancel.
+ * `interactive` stands for a TTY stdin.
+ */
+function fakeIo(answers: readonly string[] = [], interactive = true) {
 	const out: string[] = [];
 	const queue = [...answers];
 	const show = (text: string) => {
@@ -95,6 +98,7 @@ function fakeIo(answers: readonly string[] = []) {
 		return queue.shift() ?? null;
 	};
 	const io: Io = {
+		interactive,
 		print: show,
 		step: show,
 		success: show,
@@ -360,5 +364,39 @@ describe("runCli", () => {
 		expect(exit).toBe(1);
 		expect(opened).toBe(0);
 		expect(out).toContain(USAGE);
+	});
+
+	test.each<[string, string[]]>([
+		[
+			"add",
+			["keys", "add", "--venue", "binance", "--env", "demo", "--label", "x"],
+		],
+		["remove", ["keys", "remove", "x"]],
+	])(
+		"keys %s without a terminal is refused and opens nothing",
+		async (name, argv) => {
+			const { io, out } = fakeIo([], false);
+			let opened = 0;
+			const exit = await runCli(argv, io, () => {
+				opened++;
+				throw new Error("opened");
+			});
+			expect(exit).toBe(1);
+			expect(opened).toBe(0);
+			expect(out).toContain(
+				`keys ${name} needs a terminal: stdin is not a TTY`,
+			);
+			expect(out).not.toContain(USAGE);
+		},
+	);
+
+	test("keys list runs without a terminal", async () => {
+		const { io } = fakeIo([], false);
+		let opened = 0;
+		await runCli(["keys", "list"], io, () => {
+			opened++;
+			throw new Error("opened");
+		});
+		expect(opened).toBe(1);
 	});
 });
