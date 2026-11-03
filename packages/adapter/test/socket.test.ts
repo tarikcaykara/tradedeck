@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import type { Server, ServerWebSocket } from "bun";
+import type { Timers } from "../src/clock.ts";
 import {
 	createReconnectingSocket,
 	type ReconnectingSocket,
@@ -239,6 +240,57 @@ describe("createReconnectingSocket", () => {
 		await Bun.sleep(5 * 50);
 		expect(fake.connections()).toBe(1);
 		expect(log.statuses).toHaveLength(seen);
+	});
+
+	test("close() from the closed status arms no retry", async () => {
+		const armed = new Set<number>();
+		let next = 0;
+		const timers: Timers = {
+			setTimeout: () => {
+				const id = ++next;
+				armed.add(id);
+				return id;
+			},
+			clearTimeout: (h) => {
+				armed.delete(h as number);
+			},
+		};
+		const log = statusLog();
+		socket = createReconnectingSocket({
+			url: async () => {
+				throw new Error("listen key request failed");
+			},
+			onMessage: () => {},
+			onStatus: (s) => {
+				log.onStatus(s);
+				if (s.state === "closed") socket?.close();
+			},
+			timers,
+		});
+		await log.until(() => log.count("closed") === 1);
+		expect(armed.size).toBe(0);
+	});
+
+	test("close() from a connecting status resolves no further URL", async () => {
+		const log = statusLog();
+		let urls = 0;
+		socket = createReconnectingSocket({
+			url: async () => {
+				urls++;
+				throw new Error("listen key request failed");
+			},
+			onMessage: () => {},
+			// Attempt 1 starts inside createReconnectingSocket, before `socket`
+			// is assigned; attempt 2 is the first that can call close().
+			onStatus: (s) => {
+				log.onStatus(s);
+				if (s.state === "connecting" && s.attempt === 2) socket?.close();
+			},
+			random: () => 0,
+			initialDelayMs: 4,
+		});
+		await log.until(() => log.count("connecting") === 2);
+		expect(urls).toBe(1);
 	});
 
 	test("send() works only while the socket is open", async () => {

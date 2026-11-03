@@ -122,6 +122,8 @@ export function createReconnectingSocket(opts: {
 	async function connect(): Promise<void> {
 		if (closed) return;
 		onStatus?.({ state: "connecting", attempt: attempt + 1 });
+		// onStatus may have called close().
+		if (closed) return;
 		// A failed URL fetch or a throwing constructor is a failed attempt.
 		let url: string;
 		try {
@@ -178,6 +180,7 @@ export function createReconnectingSocket(opts: {
 		const retryInMs = Math.round(cap / 2 + (random() * cap) / 2);
 		attempt++;
 		onStatus?.({ state: "closed", code, reason, retryInMs });
+		if (closed) return;
 		retryTimer = timers.setTimeout(() => {
 			retryTimer = null;
 			void connect();
