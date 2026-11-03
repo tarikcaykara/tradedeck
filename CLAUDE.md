@@ -141,7 +141,7 @@ bun run check && bun run typecheck && bun test && bun run audit   # the gate —
   - the fills ledger: its schema, ingestion, deduplication and the coverage rule for average cost;
   - the live-trading flag (hard rule 7) or the server's loopback/Host/Origin guard (hard rule 3);
   - a Dependabot PR in the `money-keys` group (`decimal.js`, `zod`, `drizzle-orm`,
-    `@clack/prompts`) or any major version update;
+    `@clack/prompts`, `hono`, `@hono/bun`) or any major version update;
   - the hard rules or this list.
 
   Such a PR's body opens with `Owner review: <item>`. Claude stops once CI is green and the review
