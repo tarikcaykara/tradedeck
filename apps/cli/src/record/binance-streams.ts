@@ -20,6 +20,7 @@ import {
 	createBinanceAdapter,
 	createBinanceHttp,
 	ENDPOINTS,
+	ListenKeySchema,
 	openFuturesUserStream,
 	openSpotUserStream,
 	type StreamRecording,
@@ -162,10 +163,17 @@ let probe: WebSocket | null = null;
 try {
 	const { listenKey } = await http.request(
 		ENDPOINTS.listenKey,
-		z.object({ listenKey: z.string().min(1) }),
+		ListenKeySchema,
 	);
-	probe = new WebSocket(`${LEGACY_FUTURES_WS}${listenKey}`);
-	probe.onmessage = (frame) => {
+	// The constructor's message can quote the URL, listen key included.
+	let ws: WebSocket;
+	try {
+		ws = new WebSocket(`${LEGACY_FUTURES_WS}${listenKey}`);
+	} catch {
+		throw new Error("WebSocket constructor failed");
+	}
+	probe = ws;
+	ws.onmessage = (frame) => {
 		try {
 			const e = Fields.safeParse(JSON.parse(String(frame.data))).data?.e;
 			if (typeof e === "string") probeEvents++;
@@ -173,7 +181,7 @@ try {
 			// Not JSON: not an event.
 		}
 	};
-	probe.onerror = () => print("[probe /ws] error");
+	ws.onerror = () => print("[probe /ws] error");
 } catch (err) {
 	print(`[probe /ws] error ${message(err)}`);
 }

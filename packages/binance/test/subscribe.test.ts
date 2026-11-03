@@ -100,7 +100,7 @@ describe("subscribe: lifecycle", () => {
 		expect(
 			h.requests.filter((r) => r === "POST /fapi/v1/listenKey"),
 		).toHaveLength(2);
-		expect(h.futures().url).toEndWith("lk-2");
+		expect(h.futures().url).toEndWith("lk2");
 	});
 
 	test("three failed reconnects are down; the next success is live", async () => {
@@ -810,7 +810,7 @@ describe("subscribe: end to end over a local server", () => {
 			credential: { kind: "hmac", apiKey: "k", secret: "s" },
 			fetch: async (url, init) =>
 				new URL(url).pathname === "/fapi/v1/listenKey"
-					? Response.json({ listenKey: "lk-local" })
+					? Response.json({ listenKey: "lklocal" })
 					: fetch(url, init),
 			WebSocket: Local as unknown as WebSocketCtor,
 		});
@@ -831,7 +831,7 @@ describe("subscribe: end to end over a local server", () => {
 			.get("/ws-api/v3")
 			?.send(JSON.stringify({ subscriptionId: 0, event: executionReport() }));
 		sockets
-			.get("/private/ws/lk-local")
+			.get("/private/ws/lklocal")
 			?.send(JSON.stringify(orderTradeUpdate()));
 		await until(() => received.length === 2, 5000);
 		expect(statuses).toEqual(["connecting", "live"]);
