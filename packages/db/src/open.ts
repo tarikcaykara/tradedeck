@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { type BunSQLiteDatabase, drizzle } from "drizzle-orm/bun-sqlite";
@@ -44,4 +44,49 @@ export function openDb(path: string = defaultDbPath()): Db {
 		sqlite.close();
 		throw error;
 	}
+}
+
+/**
+ * The migrations recorded in the database against the ones this build ships.
+ * `openDb` applies every pending one, so nothing is behind after it; a
+ * database migrated by a newer build is `ahead`, which the migrator accepts
+ * without a word (it only applies what is newer than its last row).
+ */
+export function migrationStatus(db: Db): {
+	applied: number;
+	shipped: number;
+	ahead: boolean;
+} {
+	const journal: unknown = JSON.parse(
+		readFileSync(join(MIGRATIONS_DIR, "meta", "_journal.json"), "utf8"),
+	);
+	const shipped = journalTimes(journal);
+	const latest = Math.max(...shipped);
+	const rows = db.$client
+		.query<{ created_at: number }, []>(
+			"SELECT created_at FROM __drizzle_migrations",
+		)
+		.all();
+	return {
+		applied: rows.length,
+		shipped: shipped.length,
+		ahead: rows.some((row) => Number(row.created_at) > latest),
+	};
+}
+
+/** The `when` of every journal entry; drizzle-kit writes the file, so a bad one is a broken build. */
+function journalTimes(journal: unknown): number[] {
+	const entries =
+		typeof journal === "object" && journal !== null && "entries" in journal
+			? journal.entries
+			: null;
+	const times = Array.isArray(entries)
+		? entries.map((e: unknown) =>
+				typeof e === "object" && e !== null && "when" in e ? e.when : null,
+			)
+		: [];
+	if (times.length === 0 || !times.every((t) => typeof t === "number")) {
+		throw new Error("db: the migration journal is unreadable");
+	}
+	return times;
 }

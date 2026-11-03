@@ -10,6 +10,7 @@ import {
 	defaultDbPath,
 	fills,
 	insertFills,
+	migrationStatus,
 	openDb,
 } from "../src/index.ts";
 
@@ -91,6 +92,29 @@ test("reopening keeps data and applies no migration twice", () => {
 	const second = open();
 
 	expect(second.select().from(accounts).all()).toEqual([ACCOUNT]);
+});
+
+test("migrationStatus: an opened database holds every shipped migration", () => {
+	const status = migrationStatus(open());
+
+	expect(status.shipped).toBeGreaterThan(0);
+	expect(status.applied).toBe(status.shipped);
+	expect(status.ahead).toBe(false);
+});
+
+test("migrationStatus: a migration from a newer build is ahead", () => {
+	const db = open();
+	const { shipped } = migrationStatus(db);
+	db.$client.run(
+		"INSERT INTO __drizzle_migrations (hash, created_at) VALUES ('newer', ?)",
+		[Number.MAX_SAFE_INTEGER],
+	);
+
+	expect(migrationStatus(db)).toEqual({
+		applied: shipped + 1,
+		shipped,
+		ahead: true,
+	});
 });
 
 test("an account and its fills round-trip", () => {
