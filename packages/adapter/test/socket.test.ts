@@ -198,15 +198,15 @@ describe("createReconnectingSocket", () => {
 		]);
 	});
 
-	test("a throwing WebSocket constructor schedules a retry", async () => {
+	test("a throwing WebSocket constructor schedules a retry with a fixed reason", async () => {
 		class Throwing {
-			constructor() {
-				throw new Error("bad url");
+			constructor(url: string) {
+				throw new Error(`cannot connect to ${url}`);
 			}
 		}
 		const log = statusLog();
 		socket = createReconnectingSocket({
-			url: () => "ws://127.0.0.1:1",
+			url: () => "ws://127.0.0.1:1/private/ws/SECRETKEY",
 			onMessage: () => {},
 			onStatus: log.onStatus,
 			WebSocket: Throwing as unknown as WebSocketCtor,
@@ -217,7 +217,7 @@ describe("createReconnectingSocket", () => {
 		expect(log.statuses[1]).toEqual({
 			state: "closed",
 			code: null,
-			reason: "bad url",
+			reason: "WebSocket constructor failed",
 			retryInMs: 2,
 		});
 	});

@@ -7,7 +7,8 @@ export type SocketStatus =
 	/**
 	 * `code` is null when no socket was opened (URL or constructor failed).
 	 * `reason` is `"heartbeat timeout"` or `"reconnect"` when the socket
-	 * dropped the connection itself, else the close frame's reason.
+	 * dropped the connection itself, `"WebSocket constructor failed"` when the
+	 * constructor threw, else the close frame's reason.
 	 */
 	| { state: "closed"; code: number | null; reason: string; retryInMs: number };
 
@@ -121,14 +122,22 @@ export function createReconnectingSocket(opts: {
 	async function connect(): Promise<void> {
 		if (closed) return;
 		onStatus?.({ state: "connecting", attempt: attempt + 1 });
+		// A failed URL fetch or a throwing constructor is a failed attempt.
+		let url: string;
+		try {
+			url = await opts.url();
+		} catch (err) {
+			scheduleReconnect(null, err instanceof Error ? err.message : String(err));
+			return;
+		}
+		if (closed) return;
 		let ws: ClientWebSocket;
 		try {
-			const url = await opts.url();
-			if (closed) return;
 			ws = new Ctor(url);
-		} catch (err) {
-			// A failed URL fetch or a throwing constructor is a failed attempt.
-			scheduleReconnect(null, err instanceof Error ? err.message : String(err));
+		} catch {
+			// The constructor's message can quote the URL, which may carry a
+			// listen key.
+			scheduleReconnect(null, "WebSocket constructor failed");
 			return;
 		}
 		socket = ws;
