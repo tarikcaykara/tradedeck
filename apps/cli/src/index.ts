@@ -4,27 +4,40 @@
  * (hard rule 1).
  */
 import { createBinanceAdapter } from "@tradedeck/binance";
-import { openDb } from "@tradedeck/db";
+import { defaultDbPath, openDb } from "@tradedeck/db";
 import { createKeychainSecretStore } from "@tradedeck/secrets";
+import { binanceProbe } from "./binance-probe.ts";
 import { runCli } from "./cli.ts";
 import { generateEd25519KeyPair } from "./ed25519.ts";
 import { clackIo } from "./io.ts";
 
 const io = clackIo();
+const dbPath = defaultDbPath();
 // Explicit exit: clack may keep stdin referenced.
 process.exit(
-	await runCli(process.argv.slice(2), io, () => ({
-		io,
-		db: openDb(),
-		secrets: createKeychainSecretStore(),
-		verifyCredential: (account, credential) =>
-			createBinanceAdapter({
-				accountId: account.id,
-				environment: account.environment,
-				credential,
-			}).verifyCredential(),
-		generateEd25519KeyPair,
-		newAccountId: () => crypto.randomUUID(),
-		now: Date.now,
-	})),
+	await runCli(process.argv.slice(2), io, {
+		keys: () => ({
+			io,
+			db: openDb(dbPath),
+			secrets: createKeychainSecretStore(),
+			verifyCredential: (account, credential) =>
+				createBinanceAdapter({
+					accountId: account.id,
+					environment: account.environment,
+					credential,
+				}).verifyCredential(),
+			generateEd25519KeyPair,
+			newAccountId: () => crypto.randomUUID(),
+			now: Date.now,
+		}),
+		doctor: () => ({
+			io,
+			dbPath,
+			openDb: () => openDb(dbPath),
+			secrets: createKeychainSecretStore(),
+			newProbeId: () => crypto.randomUUID(),
+			// Binance is the only venue (core's VenueSchema).
+			probe: binanceProbe,
+		}),
+	}),
 );

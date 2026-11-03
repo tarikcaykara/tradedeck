@@ -16,8 +16,6 @@ import {
 	createKeychainSecretStore,
 	type KeychainBackend,
 } from "@tradedeck/secrets";
-import { runCli, USAGE } from "../src/cli.ts";
-import type { Io } from "../src/io.ts";
 import {
 	type KeysAddArgs,
 	type KeysDeps,
@@ -25,6 +23,7 @@ import {
 	keysList,
 	keysRemove,
 } from "../src/keys.ts";
+import { fakeIo } from "./support/io.ts";
 
 // Dummy values only (hard rule 1). The PEM is the RFC 8032 §7.1 TEST 2 key
 // from packages/adapter/test/signer.test.ts.
@@ -82,33 +81,6 @@ afterEach(() => {
 	db.$client.close();
 	rmSync(dir, { recursive: true, force: true });
 });
-
-/**
- * Captures every line shown or asked; answers come from a queue, empty = cancel.
- * `interactive` stands for a TTY stdin.
- */
-function fakeIo(answers: readonly string[] = [], interactive = true) {
-	const out: string[] = [];
-	const queue = [...answers];
-	const show = (text: string) => {
-		out.push(text);
-	};
-	const ask = async (message: string) => {
-		out.push(message);
-		return queue.shift() ?? null;
-	};
-	const io: Io = {
-		interactive,
-		print: show,
-		step: show,
-		success: show,
-		warn: show,
-		error: show,
-		secret: ask,
-		text: ask,
-	};
-	return { io, out, queue };
-}
 
 /**
  * In-memory stand-in with `Bun.secrets` semantics, keyed `${service}/${name}`.
@@ -344,113 +316,5 @@ describe("keys remove", () => {
 		await s.secrets.set("acc-1", HMAC);
 		expect(await keysRemove(s.deps, LABEL)).toBe(1);
 		expect(listAccounts(db)).toEqual([ROW]);
-	});
-});
-
-describe("runCli", () => {
-	test.each<[string[]]>([
-		[["keys", "add", "--venue", "binance", "--env", "prod", "--label", "x"]],
-		[["keys", "add", "--venue", "binance", "--env", "demo"]],
-		...["bad\u001b[31m", "two words", "a".repeat(65)].map(
-			(label): [string[]] => [
-				[
-					"keys",
-					"add",
-					"--venue",
-					"binance",
-					"--env",
-					"demo",
-					"--label",
-					label,
-				],
-			],
-		),
-		[["keys", "remove"]],
-		[["keys", "frobnicate"]],
-		[[]],
-	])("rejects %p with the usage and opens nothing", async (argv) => {
-		const { io, out } = fakeIo();
-		let opened = 0;
-		const exit = await runCli(argv, io, () => {
-			opened++;
-			throw new Error("opened");
-		});
-		expect(exit).toBe(1);
-		expect(opened).toBe(0);
-		expect(out).toContain(USAGE);
-	});
-
-	test("a missing label names the label rule", async () => {
-		const { io, out } = fakeIo();
-		await runCli(
-			["keys", "add", "--venue", "binance", "--env", "demo"],
-			io,
-			() => {
-				throw new Error("opened");
-			},
-		);
-		expect(out).toContain(
-			'--label must be 1–64 letters, digits, ".", "_" or "-"',
-		);
-	});
-
-	test.each(["binance-demo", "Main_2.live", "a".repeat(64)])(
-		"accepts label %p",
-		async (label) => {
-			const { io } = fakeIo();
-			let opened = 0;
-			await runCli(
-				[
-					"keys",
-					"add",
-					"--venue",
-					"binance",
-					"--env",
-					"demo",
-					"--label",
-					label,
-				],
-				io,
-				() => {
-					opened++;
-					throw new Error("opened");
-				},
-			);
-			expect(opened).toBe(1);
-		},
-	);
-
-	test.each<[string, string[]]>([
-		[
-			"add",
-			["keys", "add", "--venue", "binance", "--env", "demo", "--label", "x"],
-		],
-		["remove", ["keys", "remove", "x"]],
-	])(
-		"keys %s without a terminal is refused and opens nothing",
-		async (name, argv) => {
-			const { io, out } = fakeIo([], false);
-			let opened = 0;
-			const exit = await runCli(argv, io, () => {
-				opened++;
-				throw new Error("opened");
-			});
-			expect(exit).toBe(1);
-			expect(opened).toBe(0);
-			expect(out).toContain(
-				`keys ${name} needs a terminal: stdin is not a TTY`,
-			);
-			expect(out).not.toContain(USAGE);
-		},
-	);
-
-	test("keys list runs without a terminal", async () => {
-		const { io } = fakeIo([], false);
-		let opened = 0;
-		await runCli(["keys", "list"], io, () => {
-			opened++;
-			throw new Error("opened");
-		});
-		expect(opened).toBe(1);
 	});
 });
