@@ -187,12 +187,98 @@ describe("ServerMessageSchema", () => {
 			{ type: "account_status", accountId: "acc-1", status: "ok" },
 		],
 		["an unknown type", { type: "heartbeat" }],
+		["price with a negative price", { ...price, price: "-1" }],
+		[
+			"position with a negative entry price",
+			{ type: "position", position: { ...position, entryPrice: "-65000" } },
+		],
+		[
+			"position with a negative mark price",
+			{ type: "position", position: { ...position, markPrice: "-1" } },
+		],
+		[
+			"position with a zero liquidation price (null means none)",
+			{ type: "position", position: { ...position, liquidationPrice: "0" } },
+		],
+		[
+			"order with a negative qty",
+			{ type: "order", order: { ...order, qty: "-0.01" } },
+		],
+		[
+			"order with a negative filled qty",
+			{ type: "order", order: { ...order, filledQty: "-0.01" } },
+		],
+		[
+			"order with a zero price (null means none)",
+			{ type: "order", order: { ...order, price: "0" } },
+		],
+		[
+			"order with a negative trigger price",
+			{ type: "order", order: { ...order, triggerPrice: "-60000" } },
+		],
+		[
+			"fill with a negative qty",
+			{ type: "fill", fill: { ...fill, qty: "-1" } },
+		],
+		[
+			"fill with a negative price",
+			{ type: "fill", fill: { ...fill, price: "-65150" } },
+		],
+		[
+			"fill with 21 fraction digits",
+			{ type: "fill", fill: { ...fill, price: "1.000000000000000000001" } },
+		],
+		[
+			"balance with 21 integer digits",
+			{
+				type: "balance",
+				balance: { ...balance, total: "100000000000000000000" },
+			},
+		],
 		[
 			"balance with an unknown key",
 			{ type: "balance", balance: { ...balance, apiKey: "x" } },
 		],
 	])("rejects %s", (_, msg) => {
 		expect(ServerMessageSchema.safeParse(msg).success).toBe(false);
+	});
+
+	test.each<[string, ServerMessage]>([
+		[
+			"a negative balance (multi-assets mode)",
+			{
+				type: "balance",
+				balance: { ...balance, free: "-12.5", total: "-12.5" },
+			},
+		],
+		[
+			"a negative unrealized PnL",
+			{ type: "position", position: { ...position, unrealizedPnl: "-3.2" } },
+		],
+		[
+			"a closed position of size 0",
+			{ type: "position", position: { ...position, size: "0" } },
+		],
+		[
+			"a closePosition order of qty 0",
+			{ type: "order", order: { ...order, qty: "0" } },
+		],
+		[
+			"a fee rebate and a realized loss",
+			{ type: "fill", fill: { ...fill, fee: "-0.01", realizedPnl: "-4" } },
+		],
+		[
+			"20 integer and 20 fraction digits, leading and trailing zeros aside",
+			{
+				type: "fill",
+				fill: {
+					...fill,
+					qty: "0099999999999999999999.99999999999999999999000",
+				},
+			},
+		],
+	])("accepts %s", (_, msg) => {
+		expect(ServerMessageSchema.parse(msg)).toEqual(msg);
 	});
 });
 
@@ -201,11 +287,44 @@ describe("StateSnapshotSchema", () => {
 		expect(StateSnapshotSchema.parse(state)).toEqual(state);
 	});
 
-	test("rejects a numeric tick", () => {
+	test.each<[string, Record<string, unknown>]>([
+		["a numeric tick", { priceRule: { kind: "tick", tick: 0.01 } }],
+		["a zero tick", { priceRule: { kind: "tick", tick: "0" } }],
+		["a negative tick", { priceRule: { kind: "tick", tick: "-0.10" } }],
+		[
+			"a zero step",
+			{ qtyRule: { step: "0", marketStep: "0.001", minQty: "0.001" } },
+		],
+		[
+			"a zero market step",
+			{ qtyRule: { step: "0.001", marketStep: "0", minQty: "0.001" } },
+		],
+		[
+			"a negative minimum quantity",
+			{ qtyRule: { step: "0.001", marketStep: "0.001", minQty: "-1" } },
+		],
+		["a negative minimum notional", { minNotional: "-100" }],
+		["an id naming another symbol", { id: "binance:linear:ETHUSDT" }],
+		["an id naming another kind", { id: "binance:spot:BTCUSDT" }],
+	])("rejects an instrument with %s", (_, change) => {
 		const malformed = {
 			...state,
-			instruments: [{ ...instrument, priceRule: { kind: "tick", tick: 0.01 } }],
+			instruments: [{ ...instrument, ...change }],
 		};
 		expect(StateSnapshotSchema.safeParse(malformed).success).toBe(false);
+	});
+
+	test("accepts an instrument without minimums (0 is no minimum)", () => {
+		const free: StateSnapshot = {
+			...state,
+			instruments: [
+				{
+					...instrument,
+					qtyRule: { ...instrument.qtyRule, minQty: "0" },
+					minNotional: "0",
+				},
+			],
+		};
+		expect(StateSnapshotSchema.parse(free)).toEqual(free);
 	});
 });

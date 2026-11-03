@@ -82,8 +82,13 @@ the clock as a parameter; that is what lets `apps/web` import it.
 ## 4. Domain model
 
 Implemented in `packages/core` (M1 issue 2). Every price, quantity and money amount is a decimal
-**string** matching `^-?\d+(\.\d+)?$` (no exponent, `+` or bare dot); arithmetic happens in
-`decimal.js`, never on JS numbers. Absent values are `null` end to end and render as "—" — never a
+**string**: an optional minus, at most 20 integer digits and an optional fraction of at most 20
+digits, leading and trailing zeros aside (`DECIMAL_STRING`; no exponent, `+` or bare dot).
+Arithmetic happens in `decimal.js`, never on JS numbers, at a precision at which a difference of
+two inputs times a third is exact. Prices and quantities are never negative; ticks and steps, and
+the prices whose absence is `null` (`liquidationPrice`, an order's `price` and `triggerPrice`), are
+positive. Balances, PnL and fees stay signed. An `Instrument`'s `id` is always
+`${venue}:${kind}:${symbol}`. Absent values are `null` end to end and render as "—" — never a
 zero placeholder. Each type below is inferred from a strict Zod schema of the same name plus
 `Schema` (`Position` ← `PositionSchema`); an unknown key fails validation.
 

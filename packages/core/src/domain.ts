@@ -11,6 +11,21 @@ const Timestamp = z.number().int().nonnegative();
 export const DecimalStringSchema = z.string().regex(DECIMAL_STRING);
 export type DecimalString = z.infer<typeof DecimalStringSchema>;
 
+/** Zero or more; "-0" is zero. Prices and quantities. */
+export const NonNegativeDecimalSchema = DecimalStringSchema.refine(
+	(s) => !/^-.*[1-9]/.test(s),
+	"must not be negative",
+);
+
+/**
+ * Above zero. Grid units, and prices whose absence is `null` rather than
+ * zero (a venue's "0" maps to `null` in the adapter).
+ */
+export const PositiveDecimalSchema = DecimalStringSchema.refine(
+	(s) => !s.startsWith("-") && /[1-9]/.test(s),
+	"must be positive",
+);
+
 export const VenueSchema = z.enum(["binance"]);
 export type Venue = z.infer<typeof VenueSchema>;
 
@@ -87,7 +102,7 @@ export type AccountStatus = z.infer<typeof AccountStatusSchema>;
 /** Plain data so it serializes to the UI; applied by `roundPrice`. */
 export const PriceRuleSchema = z.discriminatedUnion("kind", [
 	// Binance, Bybit, Aster
-	z.strictObject({ kind: z.literal("tick"), tick: DecimalStringSchema }),
+	z.strictObject({ kind: z.literal("tick"), tick: PositiveDecimalSchema }),
 	// Hyperliquid
 	z.strictObject({
 		kind: z.literal("sigfig"),
@@ -97,32 +112,46 @@ export const PriceRuleSchema = z.discriminatedUnion("kind", [
 ]);
 export type PriceRule = z.infer<typeof PriceRuleSchema>;
 
-/** Plain data so it serializes to the UI; `step` is applied by `roundQty`. */
+/**
+ * Plain data so it serializes to the UI; `step` is applied by `roundQty`.
+ * A `minQty` of "0" is no minimum.
+ */
 export const QtyRuleSchema = z.strictObject({
-	step: DecimalStringSchema,
-	marketStep: DecimalStringSchema,
-	minQty: DecimalStringSchema,
+	step: PositiveDecimalSchema,
+	marketStep: PositiveDecimalSchema,
+	minQty: NonNegativeDecimalSchema,
 });
 export type QtyRule = z.infer<typeof QtyRuleSchema>;
 
-export const InstrumentSchema = z.strictObject({
-	id: InstrumentIdSchema,
-	venue: VenueSchema,
-	kind: InstrumentKindSchema,
-	/** Venue symbol, e.g. "BTCUSDT". */
-	symbol: z.string(),
-	base: z.string(),
-	quote: z.string(),
-	/** `null` for spot. */
-	settle: z.string().nullable(),
-	priceRule: PriceRuleSchema,
-	qtyRule: QtyRuleSchema,
-	minNotional: DecimalStringSchema,
-	/** `null` for spot. */
-	maxLeverage: z.number().int().positive().nullable(),
-});
+export const InstrumentSchema = z
+	.strictObject({
+		/** Always `${venue}:${kind}:${symbol}`. */
+		id: InstrumentIdSchema,
+		venue: VenueSchema,
+		kind: InstrumentKindSchema,
+		/** Venue symbol, e.g. "BTCUSDT". */
+		symbol: z.string(),
+		base: z.string(),
+		quote: z.string(),
+		/** `null` for spot. */
+		settle: z.string().nullable(),
+		priceRule: PriceRuleSchema,
+		qtyRule: QtyRuleSchema,
+		/** "0" is no minimum. */
+		minNotional: NonNegativeDecimalSchema,
+		/** `null` for spot. */
+		maxLeverage: z.number().int().positive().nullable(),
+	})
+	.refine((i) => i.id === `${i.venue}:${i.kind}:${i.symbol}`, {
+		message: "id must be venue:kind:symbol",
+		path: ["id"],
+	});
 export type Instrument = z.infer<typeof InstrumentSchema>;
 
+/**
+ * Amounts stay signed: in Binance's multi-assets mode a futures wallet
+ * balance can be negative.
+ */
 export const BalanceSchema = z.strictObject({
 	accountId: z.string(),
 	scope: z.enum(["spot", "derivs", "unified"]),
@@ -142,13 +171,11 @@ export const PositionSchema = z.strictObject({
 	 * Never negative; the direction is `side`. "0" is a closed position (§6).
 	 * A signed venue amount (Binance `positionAmt`) must be split by the adapter.
 	 */
-	size: DecimalStringSchema.refine(
-		(s) => !s.startsWith("-"),
-		"size must not be negative",
-	),
-	entryPrice: DecimalStringSchema,
-	markPrice: DecimalStringSchema,
-	liquidationPrice: DecimalStringSchema.nullable(),
+	size: NonNegativeDecimalSchema,
+	entryPrice: NonNegativeDecimalSchema,
+	markPrice: NonNegativeDecimalSchema,
+	/** `null` when the venue reports none. */
+	liquidationPrice: PositiveDecimalSchema.nullable(),
 	unrealizedPnl: DecimalStringSchema,
 	leverage: z.number().int().positive(),
 	marginMode: MarginModeSchema,
@@ -166,10 +193,13 @@ export const OrderSchema = z.strictObject({
 	side: OrderSideSchema,
 	type: OrderTypeSchema,
 	status: OrderStatusSchema,
-	qty: DecimalStringSchema,
-	filledQty: DecimalStringSchema,
-	price: DecimalStringSchema.nullable(),
-	triggerPrice: DecimalStringSchema.nullable(),
+	/** "0" for a futures order that closes the whole position. */
+	qty: NonNegativeDecimalSchema,
+	filledQty: NonNegativeDecimalSchema,
+	/** `null` for a market order. */
+	price: PositiveDecimalSchema.nullable(),
+	/** `null` without a trigger. */
+	triggerPrice: PositiveDecimalSchema.nullable(),
 	reduceOnly: z.boolean(),
 	timeInForce: TimeInForceSchema,
 	positionSide: PositionSideSchema,
@@ -184,8 +214,9 @@ export const FillSchema = z.strictObject({
 	venueTradeId: z.string(),
 	venueOrderId: z.string(),
 	side: OrderSideSchema,
-	qty: DecimalStringSchema,
-	price: DecimalStringSchema,
+	qty: NonNegativeDecimalSchema,
+	price: NonNegativeDecimalSchema,
+	/** Signed: a negative fee is a rebate. */
 	fee: DecimalStringSchema,
 	feeAsset: z.string(),
 	/** `null` for spot. */
@@ -207,7 +238,7 @@ export type AccountSnapshot = z.infer<typeof AccountSnapshotSchema>;
 /** Futures mark price or spot last price; `subscribePrices` and the `price` message. */
 export const PriceUpdateSchema = z.strictObject({
 	instrumentId: InstrumentIdSchema,
-	price: DecimalStringSchema,
+	price: NonNegativeDecimalSchema,
 	kind: z.enum(["mark", "last"]),
 	ts: Timestamp,
 });
