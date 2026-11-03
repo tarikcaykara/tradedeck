@@ -51,7 +51,9 @@ const LISTEN_KEY_MISSING = "-1125";
 const TIMESTAMP_OUTSIDE_RECV_WINDOW = "-1021";
 const SPOT_SUBSCRIBE = "userDataStream.subscribe.signature";
 
-const ListenKey = z.object({ listenKey: z.string().min(1) });
+export const ListenKeySchema = z.object({
+	listenKey: z.string().regex(/^[A-Za-z0-9]{1,256}$/),
+});
 const KeepAlive = z.object({});
 /** A WS API response (`id`) or a pushed event (`event`); other frames are ignored. */
 const SpotFrame = z.looseObject({
@@ -301,7 +303,10 @@ export function openFuturesUserStream(
 
 	async function url(): Promise<string> {
 		try {
-			const { listenKey } = await http.request(ENDPOINTS.listenKey, ListenKey);
+			const { listenKey } = await http.request(
+				ENDPOINTS.listenKey,
+				ListenKeySchema,
+			);
 			return `${BINANCE_STREAM_URLS[deps.environment].futuresPrivate}${listenKey}`;
 		} catch (err) {
 			if (!closed) listener.onError(asError(err));

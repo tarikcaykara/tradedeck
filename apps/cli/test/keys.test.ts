@@ -83,8 +83,11 @@ afterEach(() => {
 	rmSync(dir, { recursive: true, force: true });
 });
 
-/** Captures every line shown or asked; answers come from a queue, empty = cancel. */
-function fakeIo(answers: readonly string[] = []) {
+/**
+ * Captures every line shown or asked; answers come from a queue, empty = cancel.
+ * `interactive` stands for a TTY stdin.
+ */
+function fakeIo(answers: readonly string[] = [], interactive = true) {
 	const out: string[] = [];
 	const queue = [...answers];
 	const show = (text: string) => {
@@ -95,6 +98,7 @@ function fakeIo(answers: readonly string[] = []) {
 		return queue.shift() ?? null;
 	};
 	const io: Io = {
+		interactive,
 		print: show,
 		step: show,
 		success: show,
@@ -347,6 +351,20 @@ describe("runCli", () => {
 	test.each<[string[]]>([
 		[["keys", "add", "--venue", "binance", "--env", "prod", "--label", "x"]],
 		[["keys", "add", "--venue", "binance", "--env", "demo"]],
+		...["bad\u001b[31m", "two words", "a".repeat(65)].map(
+			(label): [string[]] => [
+				[
+					"keys",
+					"add",
+					"--venue",
+					"binance",
+					"--env",
+					"demo",
+					"--label",
+					label,
+				],
+			],
+		),
 		[["keys", "remove"]],
 		[["keys", "frobnicate"]],
 		[[]],
@@ -360,5 +378,79 @@ describe("runCli", () => {
 		expect(exit).toBe(1);
 		expect(opened).toBe(0);
 		expect(out).toContain(USAGE);
+	});
+
+	test("a missing label names the label rule", async () => {
+		const { io, out } = fakeIo();
+		await runCli(
+			["keys", "add", "--venue", "binance", "--env", "demo"],
+			io,
+			() => {
+				throw new Error("opened");
+			},
+		);
+		expect(out).toContain(
+			'--label must be 1–64 letters, digits, ".", "_" or "-"',
+		);
+	});
+
+	test.each(["binance-demo", "Main_2.live", "a".repeat(64)])(
+		"accepts label %p",
+		async (label) => {
+			const { io } = fakeIo();
+			let opened = 0;
+			await runCli(
+				[
+					"keys",
+					"add",
+					"--venue",
+					"binance",
+					"--env",
+					"demo",
+					"--label",
+					label,
+				],
+				io,
+				() => {
+					opened++;
+					throw new Error("opened");
+				},
+			);
+			expect(opened).toBe(1);
+		},
+	);
+
+	test.each<[string, string[]]>([
+		[
+			"add",
+			["keys", "add", "--venue", "binance", "--env", "demo", "--label", "x"],
+		],
+		["remove", ["keys", "remove", "x"]],
+	])(
+		"keys %s without a terminal is refused and opens nothing",
+		async (name, argv) => {
+			const { io, out } = fakeIo([], false);
+			let opened = 0;
+			const exit = await runCli(argv, io, () => {
+				opened++;
+				throw new Error("opened");
+			});
+			expect(exit).toBe(1);
+			expect(opened).toBe(0);
+			expect(out).toContain(
+				`keys ${name} needs a terminal: stdin is not a TTY`,
+			);
+			expect(out).not.toContain(USAGE);
+		},
+	);
+
+	test("keys list runs without a terminal", async () => {
+		const { io } = fakeIo([], false);
+		let opened = 0;
+		await runCli(["keys", "list"], io, () => {
+			opened++;
+			throw new Error("opened");
+		});
+		expect(opened).toBe(1);
 	});
 });

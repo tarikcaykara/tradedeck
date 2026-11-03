@@ -231,6 +231,8 @@ and `openOrders`, futures v3 `balance` and `positionRisk`, `symbolConfig`, `open
   same key and extends it 60 min. `PUT` every 30 min keeps it; `-1125` ("This listenKey does not
   exist") reconnects with a new `POST`; any other keepalive error is reported and the schedule
   kept. `listenKeyExpired` reconnects. `DELETE` is never sent (Endpoints).
+- The key must be 1–256 letters and digits (`ListenKeySchema`) before it enters the URL; anything
+  else is a `decode` error and a failed attempt, and no socket opens.
 - A connection lives 24 h; the adapter replaces it at 23 h.
 - Same-type events on one connection are strictly ordered by `T` and `E`.
   https://developers.binance.com/en/docs/products/derivatives-trading-usds-futures/user-data-streams
@@ -374,7 +376,9 @@ and `openOrders`, futures v3 `balance` and `positionRisk`, `symbolConfig`, `open
 - **Bans:** limits are per IP, not per key; HTTP 418 bans escalate from 2 minutes to 3 days.
 - **`recvWindow`:** default 5000 ms; spot maximum 60000; futures docs recommend ≤ 5000. Rule:
   `timestamp < serverTime + 1000 && serverTime − timestamp ≤ recvWindow`. Keep a server-time
-  offset from the time endpoints.
+  offset from the time endpoints. On a signed REST `-1021` the adapter resyncs the offset and
+  resends a `GET` once; any other method is never resent (hard rule 5), only the next signed
+  request uses the fresh offset.
 - **Idempotency:** `newClientOrderId` on spot and futures; futures pattern
   `^[\.A-Z\:/a-z0-9_-]{1,36}$`, unique among open orders. On an unknown outcome (spot 5xx /
   `-1007`, futures 503 "Unknown error") **never retry blindly** — query by `clientOrderId` or wait
@@ -408,7 +412,9 @@ and Demo user-data events from `packages/binance/__recordings__/demo/streams/`.
 - **Scrubbing:** `signature`, `timestamp` and `recvWindow` are dropped from the params, and no
   header is stored. Values under `apiKey`, `listenKey`, `uid`, `accountAlias` and `tradeGroupId`
   become placeholders of the same JSON type at any depth. `packages/binance/test/recording.test.ts`
-  guards every committed file, stream recordings included.
+  guards every committed file, stream recordings included. It also fails when the scan finds no
+  REST or no stream recording, and on any string holding 64 letters and digits in a row (the
+  shape of an API key, secret or listen key) under any field name, reporting only its path.
 - **Trimming:** `exchangeInfo`, `leverageBracket` and `symbolConfig` keep a fixed set
   (`BTCUSDT`, `ETHUSDT`, `ETHBTC` on spot, `币安人生USDT`) plus:
   - every symbol held or with an order;

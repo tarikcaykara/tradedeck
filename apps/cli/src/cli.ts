@@ -16,6 +16,12 @@ export const USAGE = [
 	"  bun run cli -- keys remove <label>",
 ].join("\n");
 
+/**
+ * Checked at `keys add` only: a label stored before the rule existed must
+ * stay removable.
+ */
+const LABEL_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
+
 type Command =
 	| { name: "add"; args: KeysAddArgs }
 	| { name: "list" }
@@ -55,7 +61,9 @@ function parse(argv: string[]): Command | string {
 		const environment = EnvironmentSchema.safeParse(values.env);
 		if (!environment.success) return "--env must be live or demo";
 		const label = values.label?.trim() ?? "";
-		if (label === "") return "--label is required";
+		if (!LABEL_PATTERN.test(label)) {
+			return '--label must be 1–64 letters, digits, ".", "_" or "-"';
+		}
 		const kind = values.kind ?? "ed25519";
 		if (kind !== "ed25519" && kind !== "hmac") {
 			return "--kind must be ed25519 or hmac";
@@ -81,8 +89,9 @@ function parse(argv: string[]): Command | string {
 }
 
 /**
- * Returns the exit code. `deps` is called only for a valid command, so a usage
- * error opens neither the database nor the keychain.
+ * Returns the exit code. `deps` is called only for a valid command that can
+ * run here: neither a usage error nor a missing terminal opens the database or
+ * the keychain.
  */
 export async function runCli(
 	argv: string[],
@@ -93,6 +102,11 @@ export async function runCli(
 	if (typeof command === "string") {
 		io.error(command);
 		io.print(USAGE);
+		return 1;
+	}
+	// `keys list` never prompts; add and remove would wait forever.
+	if (command.name !== "list" && !io.interactive) {
+		io.error(`keys ${command.name} needs a terminal: stdin is not a TTY`);
 		return 1;
 	}
 	let d: KeysDeps | undefined;

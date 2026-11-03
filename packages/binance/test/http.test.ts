@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { VenueError } from "@tradedeck/adapter";
 import { z } from "zod";
-import { ENDPOINTS } from "../src/endpoints.ts";
+import { ENDPOINTS, type Endpoint } from "../src/endpoints.ts";
 import { createBinanceHttp } from "../src/http.ts";
 
 const credential = { kind: "hmac", apiKey: "k", secret: "s" } as const;
@@ -63,6 +63,35 @@ describe("createBinanceHttp", () => {
 		expect(
 			venue.paths().filter((p) => p === "/fapi/v3/positionRisk"),
 		).toHaveLength(2);
+	});
+
+	test("a signed non-GET -1021 is not resent; the next signed request resyncs", async () => {
+		const order = {
+			host: "futures",
+			method: "POST",
+			path: "/fapi/v1/order",
+			auth: "signed",
+		} as const satisfies Endpoint;
+		const venue = fakeVenue((path) =>
+			path === "/fapi/v1/order"
+				? venueError(-1021)
+				: Response.json({ ok: true }),
+		);
+		const http = createBinanceHttp({
+			environment: "demo",
+			credential,
+			fetch: venue.fetch,
+		});
+		const err = await http.request(order, Ok).catch((e: unknown) => e);
+		expect(err).toBeInstanceOf(VenueError);
+		expect((err as VenueError).code).toBe("-1021");
+		await http.request(ENDPOINTS.positionRisk, Ok);
+		expect(venue.paths()).toEqual([
+			"/fapi/v1/time",
+			"/fapi/v1/order",
+			"/fapi/v1/time",
+			"/fapi/v3/positionRisk",
+		]);
 	});
 
 	test.each([

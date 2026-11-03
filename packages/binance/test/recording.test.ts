@@ -102,12 +102,39 @@ function unscrubbed(value: unknown, at = ""): string[] {
 	);
 }
 
+/**
+ * Paths of every string value, at any depth and under any key, that holds 64
+ * letters and digits in a row: the shape of a Binance API key, secret or
+ * listen key. Only paths are reported, so a leaked value never reaches test
+ * output or CI logs.
+ */
+function keyShaped(value: unknown, at = ""): string[] {
+	if (typeof value === "string") {
+		return /[A-Za-z0-9]{64}/.test(value) ? [at] : [];
+	}
+	if (Array.isArray(value)) {
+		return value.flatMap((v, i) => keyShaped(v, `${at}[${i}]`));
+	}
+	if (typeof value !== "object" || value === null) return [];
+	return Object.entries(value).flatMap(([k, v]) => keyShaped(v, `${at}.${k}`));
+}
+
 const files = await Array.fromAsync(
 	new Glob("**/*.json").scan({ cwd: RECORDINGS }),
-).catch((): string[] => []);
+);
 const isStream = (file: string) => file.split("/").includes("streams");
 
 describe("committed recordings", () => {
+	test("the recordings directory holds REST and stream recordings", () => {
+		expect(files.filter((f) => !isStream(f)).length).toBeGreaterThan(0);
+		expect(files.filter(isStream).length).toBeGreaterThan(0);
+	});
+
+	test.each(files)("%s holds no key-shaped string", async (file) => {
+		const json: unknown = await Bun.file(`${RECORDINGS}/${file}`).json();
+		expect(keyShaped(json)).toEqual([]);
+	});
+
 	test.each(files.filter((f) => !isStream(f)))(
 		"%s is scrubbed",
 		async (file) => {

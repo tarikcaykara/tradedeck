@@ -26,7 +26,7 @@ interface FakeVenue {
 	put: (() => Response) | null;
 }
 
-/** Time endpoints from the manual clock, listen keys `lk-<n>`. */
+/** Time endpoints from the manual clock, listen keys `lk<n>`. */
 function fakeVenue(clock: ManualClock): FakeVenue {
 	const calls: string[] = [];
 	let keys = 0;
@@ -43,7 +43,7 @@ function fakeVenue(clock: ManualClock): FakeVenue {
 				return Response.json({ serverTime: clock.now() });
 			}
 			if (pathname === "/fapi/v1/listenKey" && method === "POST") {
-				return venue.post?.() ?? Response.json({ listenKey: `lk-${++keys}` });
+				return venue.post?.() ?? Response.json({ listenKey: `lk${++keys}` });
 			}
 			if (pathname === "/fapi/v1/listenKey" && method === "PUT") {
 				return venue.put?.() ?? Response.json({});
@@ -229,7 +229,7 @@ describe("openFuturesUserStream", () => {
 	test("connects to the private path with a fresh listen key", async () => {
 		const t = setup("futures");
 		await futuresUp(t);
-		expect(t.sockets.latest(FUTURES).url).toBe(`${FUTURES}lk-1`);
+		expect(t.sockets.latest(FUTURES).url).toBe(`${FUTURES}lk1`);
 		expect(t.log).toEqual(["up"]);
 		t.sockets.latest(FUTURES).message({ e: "ORDER_TRADE_UPDATE", E: 3 });
 		t.sockets.latest(FUTURES).message({ result: null, id: 1 });
@@ -240,7 +240,7 @@ describe("openFuturesUserStream", () => {
 		const t = setup("futures", "live");
 		await until(() => t.sockets.all.length > 0);
 		expect(t.sockets.all[0]?.url).toBe(
-			"wss://fstream.binance.com/private/ws/lk-1",
+			"wss://fstream.binance.com/private/ws/lk1",
 		);
 	});
 
@@ -268,7 +268,7 @@ describe("openFuturesUserStream", () => {
 		expect(t.log).toEqual(["up", "down"]);
 		await t.clock.advance(1000);
 		expect(t.venue.count("POST /fapi/v1/listenKey")).toBe(2);
-		expect(t.sockets.latest(FUTURES).url).toBe(`${FUTURES}lk-2`);
+		expect(t.sockets.latest(FUTURES).url).toBe(`${FUTURES}lk2`);
 	});
 
 	test("another keepalive failure is reported and the schedule kept", async () => {
@@ -321,7 +321,20 @@ describe("openFuturesUserStream", () => {
 		t.venue.post = null;
 		await t.clock.advance(1000);
 		await futuresUp(t);
-		expect(t.sockets.latest(FUTURES).url).toBe(`${FUTURES}lk-1`);
+		expect(t.sockets.latest(FUTURES).url).toBe(`${FUTURES}lk1`);
+	});
+
+	test("a listen key that is not 1–256 letters and digits is a decode error and no socket", async () => {
+		const t = setup("futures");
+		t.venue.post = () => Response.json({ listenKey: "lk/../x?y" });
+		await until(() => t.log.length === 2 || t.sockets.all.length > 0);
+		expect(t.log).toEqual(["error", "down"]);
+		expect(t.errors[0]).toMatchObject({
+			kind: "decode",
+			method: "POST",
+			path: "/fapi/v1/listenKey",
+		});
+		expect(t.sockets.count(FUTURES)).toBe(0);
 	});
 
 	test("close() clears every timer and silences the listener", async () => {

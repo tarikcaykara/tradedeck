@@ -87,8 +87,9 @@ export function createBinanceHttp(opts: {
 			try {
 				body = await client.request(request);
 			} catch (err) {
-				// A stale offset is a definite rejection before processing, and
-				// every signed M1 call is a read: resync and retry exactly once.
+				// A stale offset is a definite rejection before processing: resync
+				// for the next signed request. Only a GET is resent; resending an
+				// order would bypass the OrderRouter (hard rule 5).
 				if (
 					!(err instanceof VenueError) ||
 					err.code !== TIMESTAMP_OUTSIDE_RECV_WINDOW ||
@@ -97,6 +98,7 @@ export function createBinanceHttp(opts: {
 					throw err;
 				}
 				clock.invalidate();
+				if (endpoint.method !== "GET") throw err;
 				body = await client.request(request);
 			}
 			return decode(schema, body, endpoint);

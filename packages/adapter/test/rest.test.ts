@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test";
+import type { Server } from "bun";
 import { createServerClock, type ServerClock } from "../src/clock.ts";
 import { VenueError } from "../src/errors.ts";
 import { createRestClient, type Fetch, type RestRequest } from "../src/rest.ts";
@@ -426,6 +427,45 @@ describe("errors", () => {
 			expect(text).not.toContain("timestamp=");
 		},
 	);
+});
+
+describe("redirects", () => {
+	const servers: Server<undefined>[] = [];
+
+	afterEach(() => {
+		for (const s of servers.splice(0)) s.stop(true);
+	});
+
+	test("a redirect is refused: the API key never reaches the other origin", async () => {
+		let hits = 0;
+		const other = Bun.serve({
+			port: 0,
+			fetch: () => {
+				hits++;
+				return Response.json({ ok: true });
+			},
+		});
+		servers.push(other);
+		const venue = Bun.serve({
+			port: 0,
+			fetch: () =>
+				Response.redirect(`http://127.0.0.1:${other.port}/api/v3/account`, 302),
+		});
+		servers.push(venue);
+		const client = createRestClient({
+			baseUrl: `http://127.0.0.1:${venue.port}`,
+			signer: hmac,
+			apiKeyHeader: HEADER,
+			clock: fixedClock(1_700_000_000_000),
+		});
+		const err = await client.request(signedGet).catch((e: unknown) => e);
+		expect(err).toBeInstanceOf(VenueError);
+		expect((err as VenueError).kind).toBe("network");
+		expect((err as Error).message).toStartWith(
+			"GET /api/v3/account → network: fetch failed",
+		);
+		expect(hits).toBe(0);
+	});
 });
 
 describe("fetch injection and configuration", () => {

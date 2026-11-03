@@ -121,7 +121,13 @@ export function createRestClient(opts: {
 			let res: Response;
 			let body: string;
 			try {
-				res = await fetchImpl(url, { method: req.method, headers, signal });
+				// A redirect would carry the API-key header to another origin.
+				res = await fetchImpl(url, {
+					method: req.method,
+					headers,
+					signal,
+					redirect: "error",
+				});
 				body = await res.text();
 			} catch (err) {
 				// Neither the rejection's message nor the error itself is kept: a

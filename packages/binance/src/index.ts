@@ -19,6 +19,7 @@ export {
 	trimSymbols,
 } from "./recording.ts";
 export {
+	ListenKeySchema,
 	openFuturesUserStream,
 	openSpotUserStream,
 	type UserStream,

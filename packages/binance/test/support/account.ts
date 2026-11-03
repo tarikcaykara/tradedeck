@@ -108,7 +108,7 @@ function checked<T>(
 
 /**
  * A subscribed Binance adapter on a manual clock, fake sockets and the
- * `oneway` recording. Listen keys are `lk-<n>`; position and symbol-config
+ * `oneway` recording. Listen keys are `lk<n>`; position and symbol-config
  * reads with `symbol` answer the recorded rows of that symbol.
  */
 export async function startAccount(): Promise<AccountHarness> {
@@ -134,7 +134,7 @@ export async function startAccount(): Promise<AccountHarness> {
 		if (routed !== undefined) return routed;
 		if (u.pathname === "/fapi/v1/listenKey") {
 			return method === "POST"
-				? Response.json({ listenKey: `lk-${++keys}` })
+				? Response.json({ listenKey: `lk${++keys}` })
 				: Response.json({});
 		}
 		const symbol = params.get("symbol");
