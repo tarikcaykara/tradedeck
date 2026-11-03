@@ -543,3 +543,34 @@ go. Spot drops a connection that sends more than 5 messages per second, pings an
   rounded number. The bounds cover any real price or size: 20 fraction digits exceed wei's 18.
 - Division (average cost, #13) still has to round explicitly; the precision covers only the
   operations above.
+
+## 2026-11-03 — Server: sessions, store, guard from the port, balances with venue time
+
+**Context:** M1 issue 10 (#11) adds `apps/server`. The 2026-10-29 rule "an event older than the state
+it would overwrite is dropped" needs a venue time on every row the store keeps, but `Balance` had
+none (2026-11-01 audit, raised on #11). The loopback guard (hard rule 3) has to be testable without
+port 8790 being free. Every message must match the protocol before it reaches the browser.
+
+**Decision:**
+- `Balance` gains `updatedAt`, the venue time of its values, as `Position` and `Order` have:
+  - snapshot spot: the account's `updateTime`; snapshot futures: each row's `updateTime`;
+  - spot `outboundAccountPosition`: `u` (last account update), not `E` (push time);
+  - a futures wallet re-read: the triggering event's `E`.
+  The store drops an older balance as it drops an older position or order, and removes a balance
+  whose total is zero.
+- The guard is built from the port the server listens on: 8790 in production, a random port in
+  the tests, so the tests exercise the real app.
+- Each account session owns its price subscriptions, following its held set (positions, open
+  orders, `<asset>USDT` per spot balance). Two accounts of one environment open their own price
+  sockets; sharing a feed is possible later without a protocol change.
+- `/ws` sends the snapshot, then the latest prices, then deltas. Every outgoing message is parsed
+  with `ServerMessageSchema`; one that fails is logged and dropped, never sent.
+- A missing or unreadable keychain entry leaves the account `down`; the server still starts.
+- `hono` 4.13.14 and `@hono/bun` 1.0.1 (each at least 7 days old) join Dependabot's `money-keys`
+  group: the guard, and from M2 the order routes, run on them.
+
+**Consequences:**
+- A price arrives at a new client before the first tick, so holdings have a value at once.
+- An invalid message is a bug that shows in the log while the UI keeps its last valid state.
+- A failed `loadInstruments` leaves spot holdings without a price until the server restarts;
+  positions and orders still get theirs.

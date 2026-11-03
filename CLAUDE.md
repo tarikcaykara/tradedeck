@@ -103,11 +103,12 @@ a credential or talks to a venue. Each later venue is its own package (`packages
 ## Commands
 
 `check`, `typecheck` and `test` exist since M1 issue 1 (#2), `db:generate` since #4, `cli` since
-#10 and `audit` since #39; `dev` lands with #12, together with the code it runs.
+#10, `audit` since #39 and `server` since #11; `dev` lands with #12, together with the code it runs.
 
 ```bash
 bun install
 bun run dev                      # server + Vite dev server
+bun run server                   # apps/server on 127.0.0.1:8790
 bun run cli -- <cmd>             # keys add|list|remove, doctor
 bun run db:generate              # migration from packages/db/src/schema.ts (add --name <slug>)
 bun run check && bun run typecheck && bun test && bun run audit   # the gate — green before every commit
