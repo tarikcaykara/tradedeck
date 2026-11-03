@@ -40,6 +40,7 @@ const balance: Balance = {
 	free: "1000.5",
 	locked: "0",
 	total: "1000.5",
+	updatedAt: 1_700_000_000_000,
 };
 
 const position: Position = {

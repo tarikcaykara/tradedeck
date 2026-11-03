@@ -348,6 +348,7 @@ describe("subscribe: spot outboundAccountPosition", () => {
 					free: "0.00031988",
 					locked: "0.00000000",
 					total: "0.00031988",
+					updatedAt: 1_800_000_000_200,
 				},
 			],
 			[
@@ -359,6 +360,7 @@ describe("subscribe: spot outboundAccountPosition", () => {
 					free: "4975.36734080",
 					locked: "5.00000000",
 					total: "4980.3673408",
+					updatedAt: 1_800_000_000_200,
 				},
 			],
 		]);
@@ -672,6 +674,7 @@ describe("subscribe: futures ACCOUNT_UPDATE", () => {
 					free: "4906.40560599",
 					locked: "93.43823166",
 					total: "4999.84383765",
+					updatedAt: 1_800_000_000_501,
 				},
 			],
 			[
@@ -683,6 +686,7 @@ describe("subscribe: futures ACCOUNT_UPDATE", () => {
 					free: "0",
 					locked: "0",
 					total: "0",
+					updatedAt: 1_800_000_000_501,
 				},
 			],
 		]);

@@ -255,10 +255,10 @@ and `openOrders`, futures v3 `balance` and `positionRisk`, `symbolConfig`, `open
 | Event | Emits |
 |---|---|
 | spot `executionReport` | Order: `venueOrderId` `i`, `clientOrderId` `C` when non-empty (a cancel's own id) else `c`, `LIMIT_MAKER` → post-only, `price`/`triggerPrice` from `p`/`P` (0 → null), `createdAt` `O`, `updatedAt` `T`. With `x = TRADE` also a Fill: `t`, `l` @ `L`, fee `n` in `N` |
-| spot `outboundAccountPosition` | One spot Balance per row; absolute `f`/`l`, `total = f + l` |
+| spot `outboundAccountPosition` | One spot Balance per row; absolute `f`/`l`, `total = f + l`, `updatedAt` the event's `u` (last account update; `E` is only the push time) |
 | futures `ORDER_TRADE_UPDATE` | Order from `o`: `reduceOnly = R ‖ cp`, a trailing stop's trigger is `AP`, `updatedAt` `o.T`. `LIQUIDATION` type → `market`. With `x ∈ {TRADE, CALCULATED}` also a Fill: `t`, `l` @ `L`, fee `n` (absent → `"0"`), realized PnL `rp` |
 | futures `ALGO_UPDATE` | Order from `o`: `aid`, `caid`, status via the algo-status map, `qty` `q` (`"0"` with `cp`, like the snapshot's `quantity`), `reduceOnly = R ‖ cp`, trigger `tp` (also for a trailing stop: the event has no activation price), `filledQty` `"0"`, `updatedAt` event `T` |
-| futures `ACCOUNT_UPDATE` | REST re-read of every symbol in `a.P` (`positionRisk` + `symbolConfig` with `symbol`) and of `/fapi/v3/balance` for the assets in `a.B` |
+| futures `ACCOUNT_UPDATE` | REST re-read of every symbol in `a.P` (`positionRisk` + `symbolConfig` with `symbol`) and of `/fapi/v3/balance` for the assets in `a.B`; each re-read Balance (a zero one for a missing asset too) has `updatedAt` = the event's `E`, since a row's `updateTime` can be 0 |
 | futures `ACCOUNT_CONFIG_UPDATE` with `ac` | Re-read of `ac.s` when a position is held on it |
 
 - **Why re-read:** `ACCOUNT_UPDATE.a.P` carries no mark price, liquidation price or leverage, and

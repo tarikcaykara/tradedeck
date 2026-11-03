@@ -159,6 +159,8 @@ export const BalanceSchema = z.strictObject({
 	free: DecimalStringSchema,
 	locked: DecimalStringSchema,
 	total: DecimalStringSchema,
+	/** Venue event time. */
+	updatedAt: Timestamp,
 });
 export type Balance = z.infer<typeof BalanceSchema>;
 

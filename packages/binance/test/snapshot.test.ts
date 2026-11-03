@@ -50,6 +50,7 @@ describe("fetchSnapshot, one-way recording", () => {
 					free: "0.00011988",
 					locked: "0.00000000",
 					total: "0.00011988",
+					updatedAt: 1792865224407,
 				},
 				{
 					accountId: "acc-1",
@@ -58,6 +59,7 @@ describe("fetchSnapshot, one-way recording", () => {
 					free: "4985.36734080",
 					locked: "5.00000000",
 					total: "4990.3673408",
+					updatedAt: 1792865224407,
 				},
 				{
 					accountId: "acc-1",
@@ -66,6 +68,7 @@ describe("fetchSnapshot, one-way recording", () => {
 					free: "5000.00000000",
 					locked: "0.00000000",
 					total: "5000",
+					updatedAt: 1792865224407,
 				},
 				// Derivs: total = balance, free = maxWithdrawAmount, locked = difference;
 				// FDUSD, U, BNB, ETH, USD1 are all-zero rows and dropped.
@@ -76,6 +79,7 @@ describe("fetchSnapshot, one-way recording", () => {
 					free: "0.01000000",
 					locked: "0",
 					total: "0.01000000",
+					updatedAt: 1792865236401,
 				},
 				{
 					accountId: "acc-1",
@@ -84,6 +88,7 @@ describe("fetchSnapshot, one-way recording", () => {
 					free: "4906.40560599",
 					locked: "93.43823166",
 					total: "4999.84383765",
+					updatedAt: 1792865722110,
 				},
 				{
 					accountId: "acc-1",
@@ -92,6 +97,7 @@ describe("fetchSnapshot, one-way recording", () => {
 					free: "5000.00000000",
 					locked: "0",
 					total: "5000.00000000",
+					updatedAt: 1792865236276,
 				},
 			],
 			positions: [
@@ -301,6 +307,7 @@ describe("fetchSnapshot, mutated recordings", () => {
 			free: "2.25",
 			locked: "0",
 			total: "1.5",
+			updatedAt: 1792865722110,
 		});
 		expect(() => AccountSnapshotSchema.parse(snap)).not.toThrow();
 	});
@@ -324,6 +331,7 @@ describe("fetchSnapshot, mutated recordings", () => {
 			free: "0.5",
 			locked: "0",
 			total: "0.00000000",
+			updatedAt: 0,
 		});
 	});
 

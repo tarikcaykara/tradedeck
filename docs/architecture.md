@@ -134,6 +134,7 @@ interface Balance {
   free: string;
   locked: string;
   total: string;
+  updatedAt: number;  // venue event time
 }
 
 interface Position {

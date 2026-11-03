@@ -28,6 +28,7 @@ import {
 } from "./orders.ts";
 
 const SpotAccount = z.object({
+	updateTime: z.number().int().nonnegative(),
 	balances: z.array(
 		z.object({ asset: z.string(), free: venueDecimal, locked: venueDecimal }),
 	),
@@ -38,6 +39,7 @@ export const FuturesBalances = z.array(
 		asset: z.string(),
 		balance: venueDecimal,
 		maxWithdrawAmount: venueDecimal,
+		updateTime: z.number().int().nonnegative(),
 	}),
 );
 
@@ -122,11 +124,14 @@ export function toPositions(
 /**
  * A futures wallet row, or null when it is all zero. `balance` is the wallet
  * balance (uPnL excluded); what can be moved out of the futures wallet is
- * free, the rest is margin in use.
+ * free, the rest is margin in use. `updatedAt` is the row's own `updateTime`
+ * for a snapshot; a re-read after an event passes the event's time instead
+ * (rows of assets untouched for a long time carry `updateTime` 0).
  */
 export function toFuturesBalance(
 	accountId: string,
 	row: z.infer<typeof FuturesBalances>[number],
+	updatedAt: number,
 ): Balance | null {
 	if (isZero(row.balance) && isZero(row.maxWithdrawAmount)) return null;
 	return {
@@ -136,6 +141,7 @@ export function toFuturesBalance(
 		free: row.maxWithdrawAmount,
 		locked: minusFloorZero(row.balance, row.maxWithdrawAmount),
 		total: row.balance,
+		updatedAt,
 	};
 }
 
@@ -178,9 +184,12 @@ export async function fetchSnapshot(
 					free: b.free,
 					locked: b.locked,
 					total: add(b.free, b.locked),
+					updatedAt: spotAccount.updateTime,
 				}),
 			),
-			...futuresBalances.flatMap((b) => toFuturesBalance(accountId, b) ?? []),
+			...futuresBalances.flatMap(
+				(b) => toFuturesBalance(accountId, b, b.updateTime) ?? [],
+			),
 		],
 		positions: toPositions(accountId, positionRisk, symbolConfigs),
 		openOrders: [

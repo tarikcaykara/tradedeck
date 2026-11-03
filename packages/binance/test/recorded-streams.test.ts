@@ -61,6 +61,7 @@ const spotBalance = (
 	free: string,
 	locked: string,
 	total: string,
+	updatedAt: number,
 ): Balance => ({
 	accountId: "acc-1",
 	scope: "spot",
@@ -68,16 +69,16 @@ const spotBalance = (
 	free,
 	locked,
 	total,
+	updatedAt,
 });
 
-const SPOT_ZERO_BNB = spotBalance("BNB", "0.00000000", "0.00000000", "0");
-const SPOT_BTC = spotBalance("BTC", "0.00011988", "0.00000000", "0.00011988");
-const SPOT_USDT_FREE = spotBalance(
-	"USDT",
-	"4990.36734080",
-	"0.00000000",
-	"4990.3673408",
-);
+// `updatedAt` is the event's `u` (last account update).
+const spotZeroBnb = (u: number) =>
+	spotBalance("BNB", "0.00000000", "0.00000000", "0", u);
+const spotBtc = (u: number) =>
+	spotBalance("BTC", "0.00011988", "0.00000000", "0.00011988", u);
+const spotUsdtFree = (u: number) =>
+	spotBalance("USDT", "4990.36734080", "0.00000000", "4990.3673408", u);
 
 /** Spot limit buy A: placed and cancelled inside step 1. */
 const SPOT_A: Order = {
@@ -191,15 +192,16 @@ const futuresFill = (
 	ts,
 });
 
-/** The `oneway` recording's `/fapi/v3/balance` USDT row. */
-const USDT_DERIVS: Balance = {
+/** The `oneway` recording's `/fapi/v3/balance` USDT row, stamped with the triggering event's time. */
+const usdtDerivs = (updatedAt: number): Balance => ({
 	accountId: "acc-1",
 	scope: "derivs",
 	asset: "USDT",
 	free: "4906.40560599",
 	locked: "93.43823166",
 	total: "4999.84383765",
-};
+	updatedAt,
+});
 
 // Futures positions and wallet balances are REST re-reads (decision
 // 2026-10-29), answered by the harness from the 2026-10-24 oneway REST
@@ -212,20 +214,36 @@ const EXPECTED: Record<string, ByKind> = {
 			SPOT_B,
 		],
 		balances: [
-			SPOT_BTC,
-			SPOT_ZERO_BNB,
-			spotBalance("USDT", "4975.03853880", "15.32880200", "4990.3673408"),
-			SPOT_BTC,
-			SPOT_ZERO_BNB,
-			SPOT_USDT_FREE,
-			SPOT_BTC,
-			SPOT_ZERO_BNB,
-			spotBalance("USDT", "4975.05853880", "15.30880200", "4990.3673408"),
+			spotBtc(1793389191107),
+			spotZeroBnb(1793389191107),
+			spotBalance(
+				"USDT",
+				"4975.03853880",
+				"15.32880200",
+				"4990.3673408",
+				1793389191107,
+			),
+			spotBtc(1793389263450),
+			spotZeroBnb(1793389263450),
+			spotUsdtFree(1793389263450),
+			spotBtc(1793389280901),
+			spotZeroBnb(1793389280901),
+			spotBalance(
+				"USDT",
+				"4975.05853880",
+				"15.30880200",
+				"4990.3673408",
+				1793389280901,
+			),
 		],
 	}),
 	"spot-limit-cancel": expected({
 		orders: [{ ...SPOT_B, status: "canceled", updatedAt: 1793389435939 }],
-		balances: [SPOT_BTC, SPOT_ZERO_BNB, SPOT_USDT_FREE],
+		balances: [
+			spotBtc(1793389435939),
+			spotZeroBnb(1793389435939),
+			spotUsdtFree(1793389435939),
+		],
 	}),
 	"spot-market-buy": expected({
 		orders: [
@@ -248,9 +266,21 @@ const EXPECTED: Record<string, ByKind> = {
 			},
 		],
 		balances: [
-			spotBalance("BTC", "0.00024975", "0.00000000", "0.00024975"),
-			SPOT_ZERO_BNB,
-			spotBalance("USDT", "4980.39893950", "0.00000000", "4980.3989395"),
+			spotBalance(
+				"BTC",
+				"0.00024975",
+				"0.00000000",
+				"0.00024975",
+				1793389522157,
+			),
+			spotZeroBnb(1793389522157),
+			spotBalance(
+				"USDT",
+				"4980.39893950",
+				"0.00000000",
+				"4980.3989395",
+				1793389522157,
+			),
 		],
 	}),
 	// The oneway snapshot holds a BTCUSDT position, so the leverage event re-reads it.
@@ -275,7 +305,7 @@ const EXPECTED: Record<string, ByKind> = {
 			),
 		],
 		positions: [BTC_POSITION],
-		balances: [USDT_DERIVS],
+		balances: [usdtDerivs(1793389715693)],
 	}),
 	"futures-limit-amend-cancel": expected({
 		orders: [
@@ -336,7 +366,7 @@ const EXPECTED: Record<string, ByKind> = {
 				updatedAt: 1793390386094,
 			},
 		],
-		balances: [USDT_DERIVS, USDT_DERIVS],
+		balances: [usdtDerivs(1793390386084), usdtDerivs(1793390386094)],
 	}),
 	"network-cut": expected({}),
 };
