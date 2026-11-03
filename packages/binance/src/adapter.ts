@@ -10,13 +10,13 @@ import type { Credential, Environment, InstrumentKind } from "@tradedeck/core";
 import { verifyCredential } from "./credential.ts";
 import { createBinanceHttp } from "./http.ts";
 import { loadInstruments } from "./instruments.ts";
+import { createPriceFeed } from "./prices.ts";
 import { fetchSnapshot } from "./snapshot.ts";
 import { subscribeAccount } from "./subscribe.ts";
 
 /**
- * The members implemented so far. `subscribePrices` (M1 issue 8) and
- * `fetchFills` (issue 12) widen this to `ExchangeAdapter` as they land;
- * nothing is stubbed.
+ * The members implemented so far. `fetchFills` (M1 issue 12) widens this to
+ * `ExchangeAdapter` when it lands; nothing is stubbed.
  */
 export type BinanceAdapter = Pick<
 	ExchangeAdapter,
@@ -26,6 +26,7 @@ export type BinanceAdapter = Pick<
 	| "loadInstruments"
 	| "fetchSnapshot"
 	| "subscribe"
+	| "subscribePrices"
 >;
 
 /** Architecture §5, Binance values. */
@@ -69,6 +70,15 @@ export function createBinanceAdapter(opts: {
 		now,
 		...(opts.fetch === undefined ? {} : { fetch: opts.fetch }),
 	});
+	const timers = opts.timers ?? systemTimers;
+	// Public market data: one socket per market, opened on the first
+	// subscription and closed with the last.
+	const prices = createPriceFeed({
+		environment: opts.environment,
+		now,
+		timers,
+		...(opts.WebSocket === undefined ? {} : { WebSocket: opts.WebSocket }),
+	});
 	return {
 		venue: "binance",
 		capabilities: CAPABILITIES,
@@ -82,12 +92,13 @@ export function createBinanceAdapter(opts: {
 					environment: opts.environment,
 					http,
 					now,
-					timers: opts.timers ?? systemTimers,
+					timers,
 					...(opts.WebSocket === undefined
 						? {}
 						: { WebSocket: opts.WebSocket }),
 				},
 				handlers,
 			),
+		subscribePrices: prices.subscribe,
 	};
 }

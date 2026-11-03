@@ -94,8 +94,8 @@ Examples for POST /api/v3/order" (verified 2026-10-23). Implemented by the adapt
 
 | Environment | Spot REST | Spot WS API | Spot market streams | USDⓈ-M REST | USDⓈ-M streams |
 |---|---|---|---|---|---|
-| `live` | `https://api.binance.com` | `wss://ws-api.binance.com:443/ws-api/v3` | `wss://stream.binance.com:9443` | `https://fapi.binance.com` | `wss://fstream.binance.com` — private `/private/ws/<listenKey>`, market under `/market` and `/public` |
-| `demo` | `https://demo-api.binance.com` | `wss://demo-ws-api.binance.com/ws-api/v3` | `wss://demo-stream.binance.com` | `https://demo-fapi.binance.com` | `wss://demo-fstream.binance.com` — private `/private/ws/<listenKey>` (Demo session 2026-10-30); market paths: Unverified |
+| `live` | `https://api.binance.com` | `wss://ws-api.binance.com:443/ws-api/v3` | `wss://stream.binance.com:9443` (raw `/ws`) | `https://fapi.binance.com` | `wss://fstream.binance.com` — private `/private/ws/<listenKey>`, market `/market/ws`, high-frequency `/public` |
+| `demo` | `https://demo-api.binance.com` | `wss://demo-ws-api.binance.com/ws-api/v3` | `wss://demo-stream.binance.com` (raw `/ws`; probe 2026-11-03) | `https://demo-fapi.binance.com` | `wss://demo-fstream.binance.com` — private `/private/ws/<listenKey>` (Demo session 2026-10-30), market `/market/ws` (probe 2026-11-03) |
 
 - Spot Demo Mode: keys from the Demo Trading section
   (https://demo.binance.com/en/my/settings/api-management); prices and filters mirror live; the
@@ -147,6 +147,8 @@ and count against the 10 s and 1 min order counters `[FC]`.
 | Futures listenKey keepalive | `PUT /fapi/v1/listenKey` | 1 | M1 | https://developers.binance.com/en/docs/catalog/core-trading-derivatives-trading-usd-s-m-futures/api/rest-api/user-data-streams#keepalive-user-data-stream |
 | Futures listenKey close | `DELETE /fapi/v1/listenKey` | 1 | not used: `POST` returns the account's one active key, so a `DELETE` would also end every other connection on it; an unkept key lapses after 60 min | https://developers.binance.com/en/docs/catalog/core-trading-derivatives-trading-usd-s-m-futures/api/rest-api/user-data-streams#close-user-data-stream |
 | Spot user-data subscription (WS API) | `userDataStream.subscribe.signature` | 2 | M1 | https://developers.binance.com/en/docs/catalog/core-trading-spot-trading/api/ws-api/user-data-stream#user-data-stream-subscribe-signature |
+| Spot last price (`subscribePrices`) | stream `<symbol>@miniTicker` (1 s), field `c` | stream; 5 incoming messages/s per connection | M1 | https://github.com/binance/binance-spot-api-docs/blob/master/web-socket-streams.md#individual-symbol-mini-ticker-stream |
+| Futures mark price (`subscribePrices`) | stream `<symbol>@markPrice@1s` on `/market`, field `p` | stream | M1 | https://developers.binance.com/en/docs/products/derivatives-trading-usds-futures/websocket-market-streams/Important-WebSocket-Change-Notice |
 | Spot place order | `POST /api/v3/order` | 1 | M2 | https://developers.binance.com/en/docs/catalog/core-trading-spot-trading/api/rest-api/trade#new-order |
 | Spot cancel order | `DELETE /api/v3/order` | 1 | M2 | https://developers.binance.com/en/docs/catalog/core-trading-spot-trading/api/rest-api/trade#delete-order |
 | Spot cancel all on a symbol | `DELETE /api/v3/openOrders` | 1 | M2 | https://developers.binance.com/en/docs/catalog/core-trading-spot-trading/api/rest-api/trade#delete-open-orders |
@@ -275,6 +277,40 @@ and `openOrders`, futures v3 `balance` and `positionRisk`, `symbolConfig`, `open
 - **Decode failures:** a listed event that does not match its schema (e.g. an unknown order
   status) is a `decode` `VenueError` with `method: "WS"` and `path: "<spot|futures> <e>"`, and the
   account re-snapshots without reconnecting.
+
+## Price streams
+
+`subscribePrices` (M1 issue 8), `packages/binance/src/prices.ts`. Prices are public, so no key is
+used.
+
+- **Streams:**
+  - spot: last price `c` from `<symbol>@miniTicker` (1 s, `24hrMiniTicker`), `kind: "last"`;
+  - futures: mark price `p` from `<symbol>@markPrice@1s` (`markPriceUpdate`) under `/market`,
+    `kind: "mark"`;
+  - `ts` is the event time `E`. The symbol is lowercased in the stream name; non-ASCII characters
+    stay as they are.
+- **Connections:** one raw `/ws` socket per market per adapter, opened on the first subscription
+  and closed with the last. Every `subscribePrices` call shares it.
+- **Subscriptions:**
+  - On open, the whole current set goes out in one `SUBSCRIBE`.
+  - Later changes go out as one `SUBSCRIBE` and one `UNSUBSCRIBE` diff at most once a second.
+    Spot allows 5 incoming messages per second per connection, pings and pongs included, and drops
+    a connection that sends more.
+  - A connection holds at most 1024 streams (documented maximum; what Binance does past it is not
+    documented), so a call that would take a market past 1024 throws and changes nothing.
+  - A reconnect resubscribes the current set.
+  https://github.com/binance/binance-spot-api-docs/blob/master/web-socket-streams.md#websocket-limits
+- **Demo, probed 2026-11-03** (public data, no key):
+  - `SUBSCRIBE`, `UNSUBSCRIBE` and `LIST_SUBSCRIPTIONS` work on both markets and answer
+    `{ "result": …, "id": … }`.
+  - A stream for an unknown symbol is accepted without an error and never delivers.
+  - Live is not called from development; its paths come from the docs (Environments).
+- **Failures:**
+  - A frame that is not JSON reconnects, and so does spot `serverShutdown`.
+  - A price frame that does not decode is dropped.
+  - No 23 h rotation: Binance's 24 h cut is an ordinary reconnect, and prices need no resync.
+- **Held set:** which instruments to subscribe is the server's choice (#11): positions, open
+  orders, and `<asset>USDT` for every spot balance other than USDT.
 
 ## Order rules
 
@@ -471,10 +507,6 @@ Carried from research; each item names where it gets settled.
   90 days; the 2021 validity-period announcement was marked no longer applicable on 2023-10-24
   (https://www.binance.com/en/support/announcement/detail/11e4c2f44e7a47b9b5fc0e479c0b256f).
   `doctor` (M1 issue 13) surfaces a failing credential either way.
-- **Demo futures market stream paths** (`/market`, `/public`) and the mark-price stream — M1
-  issue 8. On Demo,
-  `wss://demo-fstream.binance.com/market/ws/btcusdt@markPrice` streams `markPriceUpdate`
-  (unauthenticated probe, 2026-10-29); live is not called from development.
 - **Key permission for user-data streams:** both subscriptions are `USER_STREAM` (spot WS API
   "Subscribe to User Data Stream through signature subscription (USER_STREAM)", futures "Start
   User Data Stream (USER_STREAM)"), and the spot docs say only `TRADE` needs a permission beyond a

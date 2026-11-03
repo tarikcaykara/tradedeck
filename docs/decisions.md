@@ -484,3 +484,32 @@ Vite, Tailwind and shadcn, with hundreds of transitive packages.
 - `bun audit` needs the npm registry; an outage fails the gate's last step.
 - A stale ignore is not detected automatically; the Dependabot review of the package behind it
   checks (`CLAUDE.md`, Workflow).
+
+## 2026-11-03 — Price streams: `miniTicker` and `markPrice@1s`, one shared socket per market
+
+**Context:** M1 issue 8 (#9) implements `subscribePrices`. The futures mark price moved under
+`/market` in 2026; whether Demo had followed was unverified. `subscribePrices` returns one
+unsubscribe per call, and the server (#11) changes the held set as positions and orders come and
+go. Spot drops a connection that sends more than 5 messages per second, pings and pongs included.
+
+**Decision:**
+- Spot last price comes from `<symbol>@miniTicker` (`c`, 1 s); futures mark price from
+  `<symbol>@markPrice@1s` (`p`) on `/market/ws`. Demo serves both under the same paths as live
+  (probe 2026-11-03). `@trade` would push every trade for a price the UI shows per second.
+- Each adapter keeps one raw `/ws` socket per market, opened on the first subscription and closed
+  with the last. Every call shares it, with a reference count per instrument.
+- On open, the whole set goes out in one `SUBSCRIBE`. Later changes go out as one `SUBSCRIBE` and
+  one `UNSUBSCRIBE` diff at most once a second, so a burst of calls never trips the limit. A call
+  that would take a market past 1024 streams, Binance's documented per-connection maximum, throws
+  instead of going beyond it; sharding across connections waits for a held set that needs it.
+- There is no 23 h rotation and no error channel. A drop reconnects and resubscribes. A frame
+  that is not JSON, and spot `serverShutdown`, reconnect. A price frame that does not decode is
+  dropped.
+- The held set (positions, open orders, `<asset>USDT` per spot balance) is computed by the server,
+  which also shares one feed among accounts of the same environment if it wants to.
+
+**Consequences:**
+- A held-set change shows up within a second, without a reconnect.
+- A Binance 24 h cut costs about a second of prices; nothing is resynced.
+- A subscription to a symbol Binance does not stream is accepted and stays silent; prices of a
+  delisted instrument simply stop.
