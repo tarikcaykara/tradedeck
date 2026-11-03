@@ -1,5 +1,6 @@
 import { parseArgs } from "node:util";
 import { EnvironmentSchema, VenueSchema } from "@tradedeck/core";
+import { type DoctorDeps, runDoctor } from "./doctor.ts";
 import type { Io } from "./io.ts";
 import {
 	type KeysAddArgs,
@@ -8,12 +9,14 @@ import {
 	keysList,
 	keysRemove,
 } from "./keys.ts";
+import { message } from "./redact.ts";
 
 export const USAGE = [
 	"Usage:",
 	"  bun run cli -- keys add --venue binance --env live|demo --label <label> [--kind hmac]",
 	"  bun run cli -- keys list",
 	"  bun run cli -- keys remove <label>",
+	"  bun run cli -- doctor",
 ].join("\n");
 
 /**
@@ -25,7 +28,14 @@ const LABEL_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
 type Command =
 	| { name: "add"; args: KeysAddArgs }
 	| { name: "list" }
-	| { name: "remove"; label: string };
+	| { name: "remove"; label: string }
+	| { name: "doctor" };
+
+/** Opened only for a command that can run; tests count the calls. */
+export interface CliDeps {
+	keys(): KeysDeps;
+	doctor(): DoctorDeps;
+}
 
 interface Flags {
 	venue?: string;
@@ -54,6 +64,12 @@ function parse(argv: string[]): Command | string {
 		return e instanceof Error ? e.message : String(e);
 	}
 	const [group, name, ...rest] = positionals;
+	if (group === "doctor") {
+		const flags = Object.values(values).some((v) => v !== undefined);
+		return name === undefined && !flags
+			? { name: "doctor" }
+			: "doctor takes no arguments";
+	}
 	if (group !== "keys") return "Unknown command.";
 	if (name === "add" && rest.length === 0) {
 		const venue = VenueSchema.safeParse(values.venue);
@@ -89,14 +105,14 @@ function parse(argv: string[]): Command | string {
 }
 
 /**
- * Returns the exit code. `deps` is called only for a valid command that can
- * run here: neither a usage error nor a missing terminal opens the database or
- * the keychain.
+ * Returns the exit code. A factory in `deps` is called only for a valid
+ * command that can run here: neither a usage error nor a missing terminal opens
+ * the database or the keychain.
  */
 export async function runCli(
 	argv: string[],
 	io: Io,
-	deps: () => KeysDeps,
+	deps: CliDeps,
 ): Promise<number> {
 	const command = parse(argv);
 	if (typeof command === "string") {
@@ -104,19 +120,30 @@ export async function runCli(
 		io.print(USAGE);
 		return 1;
 	}
-	// `keys list` never prompts; add and remove would wait forever.
-	if (command.name !== "list" && !io.interactive) {
+	// add and remove prompt, and a prompt at EOF never settles.
+	if (
+		(command.name === "add" || command.name === "remove") &&
+		!io.interactive
+	) {
 		io.error(`keys ${command.name} needs a terminal: stdin is not a TTY`);
 		return 1;
 	}
+	if (command.name === "doctor") {
+		try {
+			return await runDoctor(deps.doctor());
+		} catch (e) {
+			io.error(message(e));
+			return 1;
+		}
+	}
 	let d: KeysDeps | undefined;
 	try {
-		d = deps();
+		d = deps.keys();
 		if (command.name === "add") return await keysAdd(d, command.args);
 		if (command.name === "list") return keysList(d);
 		return await keysRemove(d, command.label);
 	} catch (e) {
-		io.error(e instanceof Error ? e.message : String(e));
+		io.error(message(e));
 		return 1;
 	} finally {
 		d?.db.$client.close();

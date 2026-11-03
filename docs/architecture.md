@@ -534,6 +534,31 @@ material. `keys remove <label>` asks for the label to be typed, then deletes the
 first and the account second (its `fills` cascade). A missing keychain entry is not an error; a
 failed keychain delete keeps the account, so the command can be retried.
 
+`bun run cli -- doctor` places no order, writes no key and never prompts, so it runs without a
+terminal. It has two side effects: opening the database applies pending migrations, as every
+command does, and the futures stream check's `POST /fapi/v1/listenKey` extends the account's active
+listen key by 60 min. It prints one line per check (`ok`, `FAIL` or `skip`), then a summary, and
+exits 1 when any check fails:
+
+- **database**: opens the file, which applies pending migrations, and fails when the file holds a
+  migration from a newer build (`migrationStatus()`); drizzle's migrator accepts such a file
+  without a word. A failure skips the accounts.
+- **keychain**: reads an entry no account has; a rejection means the keychain is unreachable, and
+  the accounts are skipped.
+- **Per account**, oldest first:
+  - **credential**: the keychain entry exists. Without it, the account's other checks are skipped.
+  - **clock** per host: server time minus the local midpoint of a public time request. It fails
+    outside Binance's window (`−1000 ms < offset ≤ recvWindow`). The adapter stamps signed requests
+    with its server clock, so a clock outside the window does not break signing by itself, but
+    every signed request then depends on that clock's resync.
+  - **permissions**: `verifyCredential()`. It fails when the key cannot read or allows withdrawals
+    or transfers (hard rule 2); the stream checks are then skipped.
+  - **stream** spot and futures: opens the private stream, waits up to 15 s for it to come up and
+    closes it. The futures listen key is neither kept alive nor deleted.
+
+Error messages from the keychain or the venue are printed with the credential's values cut out, as
+in `keys add`.
+
 Permissions per milestone: live keys have "Enable Reading" only until M3, which adds "Enable Spot &
 Margin Trading" / "Enable Futures". Every Demo key created so far carried Reading, Spot & Margin &
 Stock Trading and Futures (`docs/venues/binance.md`, Keys & permissions). An IP whitelist is

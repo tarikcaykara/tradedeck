@@ -6,8 +6,9 @@ adapter interface.
 
 **Status:** M1 in progress — workspace, tooling, the core domain model, the venue adapter
 interface with its signed REST and WebSocket transport, the Binance adapter (instruments,
-credential check, account snapshot, private user-data streams with resync), and the keys CLI
-(`bun run cli -- keys add|list|remove`); the terminal itself does not run yet.
+credential check, account snapshot, private user-data streams with resync), and the CLI
+(`bun run cli -- keys add|list|remove`, `bun run cli -- doctor`); the terminal itself does not run
+yet.
 
 ## Safety model
 

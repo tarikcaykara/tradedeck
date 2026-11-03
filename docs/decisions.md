@@ -426,3 +426,33 @@ and a resent order bypasses the OrderRouter (hard rule 5).
 - A venue that ever redirects an API call fails with `network: fetch failed (UnexpectedRedirect)`
   until the base URL is fixed.
 - Scripting `keys add` or `keys remove` through a pipe is not possible; `keys list` still is.
+
+## 2026-11-03 — `doctor`: real stream probes, Binance's exact clock window, newer database fails
+
+**Context:** M1 issue 13 (#14) adds `doctor`. Its scope names the checks (keychain, database and
+migrations, credential and withdrawal permission, clock offset within `recvWindow`, private stream
+reachable), but not how each is proved. `openDb()` applies pending migrations on open, so a
+"migrations current" check would always pass. `ServerClock` keeps its offset private, and the
+adapter stamps signed requests with that clock, so a skewed local clock does not break signing
+by itself.
+
+**Decision:**
+- The streams are proved by opening them: the spot WS API subscription and the futures listen-key
+  stream, each until it is up (at most 15 s), then closed. The listen key is not deleted: `POST`
+  returns the account's one active key, shared with any running server.
+- The clock is read from the public time endpoints (server time minus the local midpoint). It
+  passes in Binance's own acceptance window for an uncompensated timestamp,
+  `−1000 ms < offset ≤ recvWindow`, rather than `|offset| ≤ recvWindow`.
+- A database holding a migration from a newer build fails (`migrationStatus()` in `packages/db`).
+- `doctor` refuses a key the way `keys add` does: a key that cannot read, or that allows
+  withdrawals or transfers, fails, and its streams are not opened.
+- Venue code stays in the venue package (`measureClockOffset`, `withinRecvWindow`,
+  `probeUserStream`, and `verifyCredential`, which is now exported). The CLI orders the checks,
+  judges permissions and prints the lines, behind an `AccountProbe` seam.
+
+**Consequences:**
+- For each account that passes the permissions check, a `doctor` run opens two real connections
+  and extends the futures listen key by 60 min.
+- A key added before a permission change on the venue is caught on the next `doctor` run.
+- Switching to an older checkout after a migration is reported instead of silently running on a
+  newer schema.

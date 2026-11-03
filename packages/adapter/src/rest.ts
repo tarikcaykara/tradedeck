@@ -31,6 +31,9 @@ export interface RestClient {
 	request(req: RestRequest): Promise<unknown>;
 }
 
+/** The `recvWindow` a signed request carries unless the client sets another. */
+export const DEFAULT_RECV_WINDOW_MS = 5000;
+
 /**
  * Query-signed scheme (Binance style): every parameter travels in the query
  * string, there is no body, and the signature covers the query exactly as
@@ -46,14 +49,14 @@ export function createRestClient(opts: {
 	apiKeyHeader?: string;
 	/** Required for `signed` requests. */
 	clock?: ServerClock;
-	/** Default 5000 ms. */
+	/** Default `DEFAULT_RECV_WINDOW_MS`. */
 	recvWindow?: number;
 	/** Default 10 s. */
 	timeoutMs?: number;
 }): RestClient {
 	const fetchImpl = opts.fetch ?? globalThis.fetch;
 	const { baseUrl, signer, apiKeyHeader, clock } = opts;
-	const recvWindow = opts.recvWindow ?? 5000;
+	const recvWindow = opts.recvWindow ?? DEFAULT_RECV_WINDOW_MS;
 	const timeoutMs = opts.timeoutMs ?? 10_000;
 
 	async function build(
