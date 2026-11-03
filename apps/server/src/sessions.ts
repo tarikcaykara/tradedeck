@@ -49,10 +49,13 @@ export function startSessions(deps: {
 		try {
 			credential = await deps.secrets.get(account.id);
 		} catch (e) {
+			// stop() may have run while the keychain answered.
+			if (stopped) return;
 			say(`keychain: ${message(e)}`);
 			store.setStatus(account.id, "down");
 			return;
 		}
+		if (stopped) return;
 		if (credential === null) {
 			say(
 				`no keychain entry; run bun run cli -- keys remove ${account.label}, then keys add`,

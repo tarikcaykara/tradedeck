@@ -65,13 +65,20 @@ interface AccountState {
 		balances: Map<string, Balance>;
 		positions: Map<string, Position>;
 		orders: Map<string, Order>;
+		/**
+		 * The time of the last change accepted per row, kept after the row is
+		 * removed, so an older event cannot bring a removed row back. A snapshot
+		 * reseeds it.
+		 */
+		times: Map<string, number>;
 		fetchedAt: number;
 	} | null;
 }
 
-const balanceKey = (b: Balance) => `${b.scope}|${b.asset}`;
-const positionKey = (p: Position) => `${p.instrumentId}|${p.positionSide}`;
-const orderKey = (o: Order) => `${o.instrumentId}|${o.venueOrderId}`;
+const balanceKey = (b: Balance) => `balance|${b.scope}|${b.asset}`;
+const positionKey = (p: Position) =>
+	`position|${p.instrumentId}|${p.positionSide}`;
+const orderKey = (o: Order) => `order|${o.instrumentId}|${o.venueOrderId}`;
 /** A valid decimal string without a non-zero digit is zero ("0.000", "-0"). */
 const isZero = (value: string) => !/[1-9]/.test(value);
 
@@ -89,16 +96,17 @@ export function createStore(): Store {
 		return accounts.get(accountId)?.snapshot ?? null;
 	}
 
-	/** Puts or removes `next` unless the stored value is newer; true when applied. */
+	/** Puts or removes `next` unless the row changed later; true when applied. */
 	function put<T extends { updatedAt: number }>(
+		times: Map<string, number>,
 		map: Map<string, T>,
 		key: string,
 		next: T,
 		remove: boolean,
 	): boolean {
-		const current = map.get(key);
-		if (current !== undefined && next.updatedAt < current.updatedAt)
-			return false;
+		const last = times.get(key);
+		if (last !== undefined && next.updatedAt < last) return false;
+		times.set(key, next.updatedAt);
 		if (remove) map.delete(key);
 		else map.set(key, next);
 		return true;
@@ -167,10 +175,17 @@ export function createStore(): Store {
 		applySnapshot(snapshot) {
 			const a = accounts.get(snapshot.accountId);
 			if (a === undefined) return;
+			const times = new Map<string, number>();
+			for (const b of snapshot.balances) times.set(balanceKey(b), b.updatedAt);
+			for (const p of snapshot.positions) {
+				times.set(positionKey(p), p.updatedAt);
+			}
+			for (const o of snapshot.openOrders) times.set(orderKey(o), o.updatedAt);
 			a.snapshot = {
 				balances: new Map(snapshot.balances.map((b) => [balanceKey(b), b])),
 				positions: new Map(snapshot.positions.map((p) => [positionKey(p), p])),
 				orders: new Map(snapshot.openOrders.map((o) => [orderKey(o), o])),
+				times,
 				fetchedAt: snapshot.fetchedAt,
 			};
 			emit({ type: "snapshot", state: state() });
@@ -179,7 +194,13 @@ export function createStore(): Store {
 			const s = snapshotOf(balance.accountId);
 			if (s === null) return;
 			if (
-				put(s.balances, balanceKey(balance), balance, isZero(balance.total))
+				put(
+					s.times,
+					s.balances,
+					balanceKey(balance),
+					balance,
+					isZero(balance.total),
+				)
 			) {
 				emit({ type: "balance", balance });
 			}
@@ -188,7 +209,13 @@ export function createStore(): Store {
 			const s = snapshotOf(position.accountId);
 			if (s === null) return;
 			if (
-				put(s.positions, positionKey(position), position, isZero(position.size))
+				put(
+					s.times,
+					s.positions,
+					positionKey(position),
+					position,
+					isZero(position.size),
+				)
 			) {
 				emit({ type: "position", position });
 			}
@@ -196,7 +223,9 @@ export function createStore(): Store {
 		applyOrder(order) {
 			const s = snapshotOf(order.accountId);
 			if (s === null) return;
-			if (put(s.orders, orderKey(order), order, TERMINAL[order.status])) {
+			if (
+				put(s.times, s.orders, orderKey(order), order, TERMINAL[order.status])
+			) {
 				emit({ type: "order", order });
 			}
 		},

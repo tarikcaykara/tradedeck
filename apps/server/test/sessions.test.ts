@@ -146,6 +146,22 @@ describe("startSessions", () => {
 		expect(t.logs).toContain("[binance-demo] keychain: keychain locked");
 	});
 
+	test.each<[string, Record<string, Credential | Error>]>([
+		["a credential", { [DEMO.id]: HMAC }],
+		["no entry", {}],
+		["a keychain error", { [DEMO.id]: new Error("keychain locked") }],
+	])(
+		"stop() during the keychain lookup ends start-up there (%s)",
+		async (_, credentials) => {
+			const t = setup({ credentials });
+			t.sessions.stop();
+			await t.sessions.started;
+			expect(t.fakes.size).toBe(0);
+			expect(status(t.store, DEMO.id)).toBe("connecting");
+			expect(t.logs).toEqual([]);
+		},
+	);
+
 	test("instruments, statuses and the snapshot reach the store; the held set gets prices", async () => {
 		const t = setup();
 		await t.sessions.started;

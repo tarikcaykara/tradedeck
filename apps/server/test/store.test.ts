@@ -159,6 +159,43 @@ describe("createStore", () => {
 			]);
 		});
 
+		test("a removed row keeps its time: an older event cannot bring it back", () => {
+			const t = setup();
+			t.store.applySnapshot(
+				snapshot({
+					balances: [balance("BTC", "1", T0 + 10)],
+					positions: [position("0.01", T0 + 10)],
+					openOrders: [order("new", T0 + 10)],
+				}),
+			);
+			t.store.applyBalance(balance("BTC", "0", T0 + 20));
+			t.store.applyPosition(position("0", T0 + 20));
+			t.store.applyOrder(order("canceled", T0 + 20));
+			t.sent.length = 0;
+			t.store.applyBalance(balance("BTC", "1", T0 + 15));
+			t.store.applyPosition(position("0.01", T0 + 15));
+			t.store.applyOrder(order("new", T0 + 15));
+			expect(t.sent).toEqual([]);
+			expect(demo(t.store)).toMatchObject({
+				balances: [],
+				positions: [],
+				openOrders: [],
+			});
+		});
+
+		test("a snapshot is authoritative: it resets the remembered times", () => {
+			const t = setup();
+			t.store.applySnapshot(
+				snapshot({ positions: [position("0.01", T0 + 10)] }),
+			);
+			t.store.applyPosition(position("0", T0 + 20));
+			t.store.applySnapshot(
+				snapshot({ positions: [position("0.02", T0 + 5)] }),
+			);
+			t.store.applyPosition(position("0.03", T0 + 6));
+			expect(demo(t.store)?.positions).toEqual([position("0.03", T0 + 6)]);
+		});
+
 		test("a delta for an account without a snapshot is dropped", () => {
 			const t = setup();
 			t.store.applyPosition(position("1"));
