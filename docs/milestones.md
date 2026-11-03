@@ -31,15 +31,20 @@ list; the GitHub issue number follows each item.
 12. Binance: spot fills ledger and average cost (#13).
 13. CLI: `doctor` (#14).
 
-Work order for the open issues, unless the owner picks another unblocked one:
-**#10 → #14 → #9 → #11 → #12 → #13**. Each issue's open blockers are also set as GitHub issue
-dependencies ("blocked by").
+Work order for the open issues, unless the owner picks another unblocked one (approved
+2026-11-03): **#14 → #39 → #9 → #38 → #11 → #12 → #13**. Each issue's open blockers are also set
+as GitHub issue dependencies ("blocked by"); #39 and #38 are ordering choices, not blockers.
 
-- #10 first: the server (#11) loads accounts from the DB and the `SecretStore`, and only
+- #10 came first: the server (#11) loads accounts from the DB and the `SecretStore`, and only
   `keys add` creates them. The design rounds that run with #11 need a Demo account's real state.
 - #14 next: it needs only #8 and #10, reuses the CLI pieces #10 adds (`SecretStore`,
   `verifyCredential()`, account rows), and gives a one-line-per-check report on keychain, clock
   and stream problems before server work begins.
+- #39 (`bun audit` in CI) before #11: #11 and #12 bring Hono, React, Vite, Tailwind and shadcn
+  with hundreds of transitive packages, and GitHub's dependency graph does not read `bun.lock`,
+  so the audit gate has to exist before they land.
+- #38 (core schema value constraints) before #11: the server and the web app are the first
+  consumers of core's protocol schemas, so the constraints are tightened before they exist.
 - #9 before #11, #11 before #12: hard dependencies.
 - #13 last: a holding the ledger does not cover must show "—" in #12's holdings table.
 
