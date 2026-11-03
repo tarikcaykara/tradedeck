@@ -499,7 +499,9 @@ go. Spot drops a connection that sends more than 5 messages per second, pings an
 - Each adapter keeps one raw `/ws` socket per market, opened on the first subscription and closed
   with the last. Every call shares it, with a reference count per instrument.
 - On open, the whole set goes out in one `SUBSCRIBE`. Later changes go out as one `SUBSCRIBE` and
-  one `UNSUBSCRIBE` diff at most once a second, so a burst of calls never trips the limit.
+  one `UNSUBSCRIBE` diff at most once a second, so a burst of calls never trips the limit. A call
+  that would take a market past 1024 streams, Binance's per-connection maximum, throws instead of
+  silently losing the excess; sharding across connections waits for a held set that needs it.
 - There is no 23 h rotation and no error channel. A drop reconnects and resubscribes. A frame
   that is not JSON, and spot `serverShutdown`, reconnect. A price frame that does not decode is
   dropped.

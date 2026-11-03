@@ -295,7 +295,9 @@ used.
   - On open, the whole current set goes out in one `SUBSCRIBE`.
   - Later changes go out as one `SUBSCRIBE` and one `UNSUBSCRIBE` diff at most once a second.
     Spot allows 5 incoming messages per second per connection, pings and pongs included, and drops
-    a connection that sends more; a connection holds at most 1024 streams.
+    a connection that sends more.
+  - A connection holds at most 1024 streams. Past that, Binance accepts the `SUBSCRIBE` and never
+    delivers the excess, so a call that would take a market past 1024 throws and changes nothing.
   - A reconnect resubscribes the current set.
   https://github.com/binance/binance-spot-api-docs/blob/master/web-socket-streams.md#websocket-limits
 - **Demo, probed 2026-11-03** (public data, no key):

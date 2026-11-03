@@ -44,6 +44,8 @@ type Market = "spot" | "futures";
  * and drops a connection that sends more.
  */
 const CONTROL_INTERVAL_MS = 1000;
+/** Spot's documented per-connection maximum; applied to futures as well. */
+const MAX_STREAMS = 1024;
 
 const Event = z.looseObject({ e: z.string() });
 const MiniTicker = z.looseObject({
@@ -228,6 +230,20 @@ export function createPriceFeed(deps: PriceFeedDeps): PriceFeed {
 		subscribe(instrumentIds, onPrice) {
 			const ids = [...new Set(instrumentIds)];
 			const markets = new Set(ids.map((id) => route(id).market));
+			// Checked before anything is registered: past the limit Binance would
+			// accept the SUBSCRIBE and never deliver the excess.
+			for (const market of markets) {
+				const streams = wanted(market);
+				for (const id of ids) {
+					const r = route(id);
+					if (r.market === market) streams.add(r.stream);
+				}
+				if (streams.size > MAX_STREAMS) {
+					throw new Error(
+						`binance: more than ${MAX_STREAMS} ${market} price streams on one connection`,
+					);
+				}
+			}
 			const subscription: Subscription = { onPrice };
 			for (const id of ids) {
 				const set = subscribers.get(id) ?? new Set();

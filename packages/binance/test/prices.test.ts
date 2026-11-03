@@ -260,4 +260,24 @@ describe("subscribePrices", () => {
 			expect(t.sockets.all).toHaveLength(0);
 		},
 	);
+
+	test("a call that would take a market past 1024 streams throws and changes nothing", async () => {
+		const t = setup();
+		const ids = Array.from(
+			{ length: 1023 },
+			(_, i): InstrumentId => `binance:spot:S${i}USDT`,
+		);
+		t.feed.subscribe(ids, t.onPrice);
+		expect(() => t.feed.subscribe([ETH_SPOT, SOL_SPOT], t.onPrice)).toThrow(
+			"binance: more than 1024 spot price streams on one connection",
+		);
+		t.feed.subscribe([ETH_SPOT, BTC_PERP], t.onPrice);
+		await t.clock.advance(0);
+		const ws = t.sockets.latest(SPOT);
+		ws.open();
+		const [first] = controls(ws);
+		expect(first?.params).toHaveLength(1024);
+		expect(first?.params).toContain("ethusdt@miniTicker");
+		expect(first?.params).not.toContain("solusdt@miniTicker");
+	});
 });
