@@ -280,9 +280,10 @@ interface KindCapabilities {
 }
 
 // The members M1 has implemented so far; it widens to ExchangeAdapter once
-// subscribePrices (M1 issue 8) and fetchFills (12) land.
+// fetchFills (M1 issue 12) lands.
 type BinanceAdapter = Pick<ExchangeAdapter,
-  'venue' | 'capabilities' | 'verifyCredential' | 'loadInstruments' | 'fetchSnapshot' | 'subscribe'>;
+  'venue' | 'capabilities' | 'verifyCredential' | 'loadInstruments' | 'fetchSnapshot' | 'subscribe'
+  | 'subscribePrices'>;
 
 declare function createBinanceAdapter(opts: {
   accountId: string;              // stamped on every balance, position and order
@@ -389,9 +390,11 @@ venue: base URLs, the API-key header and the server-time endpoint come from the 
 - A position with size `"0"` is removed; an order reaching a terminal status (`filled`,
   `canceled`, `rejected`, `expired`) leaves the open-orders list.
 - Prices: `subscribePrices` covers every instrument the account holds or has an order on —
-  futures mark price, spot last price against USDT. uPnL is recomputed in core from the mark
-  stream: long `(mark − entry) × size`, short `(entry − mark) × size`. Spot holding value is
-  `total × last`.
+  futures mark price, spot last price against USDT. The server picks that set; the adapter
+  multiplexes every `subscribePrices` call onto one socket per market and sends only the changes,
+  and a reconnect resubscribes the current set (`docs/venues/binance.md`, Price streams). uPnL is
+  recomputed in core from the mark stream: long `(mark − entry) × size`, short
+  `(entry − mark) × size`. Spot holding value is `total × last`.
 - The UI shows per-account status and a "stale" badge on every row of an account whose status is
   not `live`.
 
@@ -628,5 +631,5 @@ Copied from `docs/venues/binance.md` (sources there). Demo is authoritative for 
 
 | Environment | Spot REST | Spot WS API | Spot market streams | USDⓈ-M REST | USDⓈ-M streams |
 |---|---|---|---|---|---|
-| `live` | `https://api.binance.com` | `wss://ws-api.binance.com:443/ws-api/v3` | `wss://stream.binance.com:9443` | `https://fapi.binance.com` | `wss://fstream.binance.com` — private `/private/ws/<listenKey>`, market under `/market` and `/public` |
-| `demo` | `https://demo-api.binance.com` | `wss://demo-ws-api.binance.com/ws-api/v3` | `wss://demo-stream.binance.com` | `https://demo-fapi.binance.com` | `wss://demo-fstream.binance.com` — private `/private/ws/<listenKey>` (Demo session 2026-10-30); market paths: Unverified |
+| `live` | `https://api.binance.com` | `wss://ws-api.binance.com:443/ws-api/v3` | `wss://stream.binance.com:9443` (raw `/ws`) | `https://fapi.binance.com` | `wss://fstream.binance.com` — private `/private/ws/<listenKey>`, market `/market/ws`, high-frequency `/public` |
+| `demo` | `https://demo-api.binance.com` | `wss://demo-ws-api.binance.com/ws-api/v3` | `wss://demo-stream.binance.com` (raw `/ws`; probe 2026-11-03) | `https://demo-fapi.binance.com` | `wss://demo-fstream.binance.com` — private `/private/ws/<listenKey>` (Demo session 2026-10-30), market `/market/ws` (probe 2026-11-03) |
