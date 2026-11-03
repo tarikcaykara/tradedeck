@@ -1,7 +1,8 @@
 /**
  * `doctor` (docs/architecture.md §9): one line per check, exit 1 when any
- * check fails. It only reads: the database, the keychain and the venue. No
- * output line carries key material (hard rule 1).
+ * check fails. It writes no key and places no order; opening the database
+ * applies pending migrations, and the futures stream check extends the active
+ * listen key. No output line carries key material (hard rule 1).
  */
 import type { Credential, CredentialReport } from "@tradedeck/core";
 import {

@@ -534,8 +534,11 @@ material. `keys remove <label>` asks for the label to be typed, then deletes the
 first and the account second (its `fills` cascade). A missing keychain entry is not an error; a
 failed keychain delete keeps the account, so the command can be retried.
 
-`bun run cli -- doctor` only reads. It never prompts, so it runs without a terminal. It prints one
-line per check (`ok`, `FAIL` or `skip`), then a summary, and exits 1 when any check fails:
+`bun run cli -- doctor` places no order, writes no key and never prompts, so it runs without a
+terminal. It has two side effects: opening the database applies pending migrations, as every
+command does, and the futures stream check's `POST /fapi/v1/listenKey` extends the account's active
+listen key by 60 min. It prints one line per check (`ok`, `FAIL` or `skip`), then a summary, and
+exits 1 when any check fails:
 
 - **database**: opens the file, which applies pending migrations, and fails when the file holds a
   migration from a newer build (`migrationStatus()`); drizzle's migrator accepts such a file

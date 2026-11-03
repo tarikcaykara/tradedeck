@@ -451,8 +451,8 @@ by itself.
   judges permissions and prints the lines, behind an `AccountProbe` seam.
 
 **Consequences:**
-- Each `doctor` run opens two real connections per account and extends the futures listen key by
-  60 min.
+- For each account that passes the permissions check, a `doctor` run opens two real connections
+  and extends the futures listen key by 60 min.
 - A key added before a permission change on the venue is caught on the next `doctor` run.
 - Switching to an older checkout after a migration is reported instead of silently running on a
   newer schema.
