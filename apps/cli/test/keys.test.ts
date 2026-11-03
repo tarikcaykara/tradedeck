@@ -351,6 +351,20 @@ describe("runCli", () => {
 	test.each<[string[]]>([
 		[["keys", "add", "--venue", "binance", "--env", "prod", "--label", "x"]],
 		[["keys", "add", "--venue", "binance", "--env", "demo"]],
+		...["bad\u001b[31m", "two words", "a".repeat(65)].map(
+			(label): [string[]] => [
+				[
+					"keys",
+					"add",
+					"--venue",
+					"binance",
+					"--env",
+					"demo",
+					"--label",
+					label,
+				],
+			],
+		),
 		[["keys", "remove"]],
 		[["keys", "frobnicate"]],
 		[[]],
@@ -365,6 +379,46 @@ describe("runCli", () => {
 		expect(opened).toBe(0);
 		expect(out).toContain(USAGE);
 	});
+
+	test("a missing label names the label rule", async () => {
+		const { io, out } = fakeIo();
+		await runCli(
+			["keys", "add", "--venue", "binance", "--env", "demo"],
+			io,
+			() => {
+				throw new Error("opened");
+			},
+		);
+		expect(out).toContain(
+			'--label must be 1–64 letters, digits, ".", "_" or "-"',
+		);
+	});
+
+	test.each(["binance-demo", "Main_2.live", "a".repeat(64)])(
+		"accepts label %p",
+		async (label) => {
+			const { io } = fakeIo();
+			let opened = 0;
+			await runCli(
+				[
+					"keys",
+					"add",
+					"--venue",
+					"binance",
+					"--env",
+					"demo",
+					"--label",
+					label,
+				],
+				io,
+				() => {
+					opened++;
+					throw new Error("opened");
+				},
+			);
+			expect(opened).toBe(1);
+		},
+	);
 
 	test.each<[string, string[]]>([
 		[

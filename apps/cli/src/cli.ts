@@ -16,6 +16,12 @@ export const USAGE = [
 	"  bun run cli -- keys remove <label>",
 ].join("\n");
 
+/**
+ * Checked at `keys add` only: a label stored before the rule existed must
+ * stay removable.
+ */
+const LABEL_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
+
 type Command =
 	| { name: "add"; args: KeysAddArgs }
 	| { name: "list" }
@@ -55,7 +61,9 @@ function parse(argv: string[]): Command | string {
 		const environment = EnvironmentSchema.safeParse(values.env);
 		if (!environment.success) return "--env must be live or demo";
 		const label = values.label?.trim() ?? "";
-		if (label === "") return "--label is required";
+		if (!LABEL_PATTERN.test(label)) {
+			return '--label must be 1–64 letters, digits, ".", "_" or "-"';
+		}
 		const kind = values.kind ?? "ed25519";
 		if (kind !== "ed25519" && kind !== "hmac") {
 			return "--kind must be ed25519 or hmac";
