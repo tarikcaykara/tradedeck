@@ -11,6 +11,6 @@
 		"@tradedeck/core": "workspace:*",
 		"@tradedeck/db": "workspace:*",
 		"@tradedeck/secrets": "workspace:*",
-		"hono": "^4.13.14"
+		"hono": "^4.13.16"
 	}
 }
