@@ -5,7 +5,7 @@
 	"type": "module",
 	"description": "keys add, list and remove; doctor.",
 	"dependencies": {
-		"@clack/prompts": "^1.8.1",
+		"@clack/prompts": "^1.9.0",
 		"@tradedeck/adapter": "workspace:*",
 		"@tradedeck/binance": "workspace:*",
 		"@tradedeck/core": "workspace:*",
