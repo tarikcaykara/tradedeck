@@ -4,8 +4,7 @@ Local-first, open-source multi-exchange trading terminal: monitor spot balances 
 positions and trade from one screen. Binance first; more CEXes and perp DEXes behind the same
 adapter interface.
 
-The owner communicates in Turkish and expects Turkish replies; everything in the repo — code,
-comments, docs, UI copy, commits, issues — is English.
+Everything in the repo — code, comments, docs, UI copy, commits, issues — is English.
 
 ## Read first
 
@@ -116,8 +115,7 @@ bun run check && bun run typecheck && bun test && bun run audit   # the gate —
 
 ## Workflow
 
-- `gh` runs as the repo owner: prefix every call with `GH_TOKEN="$(gh auth token -u tarikcaykara)"`
-  (the active gh account is a different one). Never ask for, store or handle credentials.
+- Never ask for, store or handle credentials.
 - One issue at a time, chosen by the owner. Issue → branch `<type>/<issue>-<slug>` → PR →
   reviewer-agent pass → green CI → squash merge with the PR title as the commit subject.
 - `master` is protected by a ruleset: PR only, squash only, the `gate` check green on a branch
